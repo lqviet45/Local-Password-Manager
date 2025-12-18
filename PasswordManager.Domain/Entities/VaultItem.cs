@@ -6,9 +6,14 @@ namespace PasswordManager.Domain.Entities;
 /// Represents a password vault entry (login, secure note, card, etc.).
 /// Immutable record for thread safety and value semantics.
 /// </summary>
-public class VaultItem
+public sealed record VaultItem
 {
     public Guid Id { get; init; } = Guid.NewGuid();
+    
+    /// <summary>
+    /// Owner user ID
+    /// </summary>
+    public required Guid UserId { get; init; }
     
     /// <summary>
     /// Item type (Login, SecureNote, CreditCard, etc.)
