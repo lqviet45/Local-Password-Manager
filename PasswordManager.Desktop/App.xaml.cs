@@ -36,7 +36,7 @@ public partial class App : Application
             .UseSerilog((context, loggerConfig) =>
             {
                 loggerConfig
-                    .MinimumLevel.Information()
+                    .MinimumLevel.Debug()
                     .MinimumLevel.Override("Microsoft", Serilog.Events.LogEventLevel.Warning)
                     .MinimumLevel.Override("System", Serilog.Events.LogEventLevel.Warning)
                     .Enrich.FromLogContext()
@@ -55,29 +55,27 @@ public partial class App : Application
         services.AddSingleton(configuration);
 
         // Infrastructure Services (LOCAL-ONLY MODE)
-        // SQLCipher password will be derived from user's master password
-        // For now, we'll use a temporary placeholder that gets set after login
         services.AddInfrastructureForDesktop("temporary_password_will_be_replaced");
 
         // Application Services
         services.AddSingleton<IMasterPasswordService, MasterPasswordService>();
         services.AddSingleton<ISessionService, SessionService>();
-        services.AddTransient<IDialogService, DialogService>();
-        services.AddTransient<IClipboardService, ClipboardService>();
+        services.AddSingleton<IDialogService, DialogService>();
+        services.AddSingleton<IClipboardService, ClipboardService>();
+        services.AddSingleton<IWindowFactory, WindowFactory>();
 
-        // ViewModels (Transient for fresh instances)
+        // ViewModels - Transient (new instance each time)
         services.AddTransient<LoginViewModel>();
         services.AddTransient<VaultViewModel>();
         services.AddTransient<SettingsViewModel>();
         services.AddTransient<MainViewModel>();
-        // services.AddTransient<AddEditItemViewModel>();
 
-        // Views (Transient)
+        // Views - Transient
         services.AddTransient<LoginWindow>();
         services.AddTransient<MainWindow>();
-
-        // Register Window Factory
-        services.AddSingleton<IWindowFactory, WindowFactory>();
+        
+        // Add Logging
+        services.AddLogging();
     }
 
     protected override async void OnStartup(StartupEventArgs e)
@@ -86,14 +84,41 @@ public partial class App : Application
 
         await _host.StartAsync();
 
+        // Get logger
+        var logger = _host.Services.GetRequiredService<ILogger<App>>();
+        logger.LogInformation("=== APPLICATION STARTUP ===");
+
         // Initialize database
         var serviceProvider = _host.Services;
-        await DependencyInjection.InitializeDatabaseAsync(serviceProvider);
+        try
+        {
+            await DependencyInjection.InitializeDatabaseAsync(serviceProvider);
+            logger.LogInformation("Database initialized successfully");
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to initialize database");
+            MessageBox.Show($"Failed to initialize database: {ex.Message}", "Error", 
+                MessageBoxButton.OK, MessageBoxImage.Error);
+            Shutdown();
+            return;
+        }
 
         // Show login window
-        var windowFactory = serviceProvider.GetRequiredService<IWindowFactory>();
-        var loginWindow = windowFactory.CreateLoginWindow();
-        loginWindow.Show();
+        try
+        {
+            var windowFactory = serviceProvider.GetRequiredService<IWindowFactory>();
+            var loginWindow = windowFactory.CreateLoginWindow();
+            loginWindow.Show();
+            logger.LogInformation("Login window displayed");
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to show login window");
+            MessageBox.Show($"Failed to show login window: {ex.Message}", "Error",
+                MessageBoxButton.OK, MessageBoxImage.Error);
+            Shutdown();
+        }
     }
 
     protected override async void OnExit(ExitEventArgs e)

@@ -7,10 +7,12 @@
         d:DataContext="{d:DesignInstance Type=viewmodels:LoginViewModel}"
         mc:Ignorable="d"
         Title="Password Manager" 
-        Height="500" 
-        Width="400"
+        Height="650" 
+        Width="450"
+        MinHeight="500"
+        MinWidth="400"
         WindowStartupLocation="CenterScreen"
-        ResizeMode="NoResize"
+        ResizeMode="CanResize"
         Background="White">
 
     <Grid>
@@ -31,247 +33,269 @@
             </StackPanel>
         </Border>
 
-        <!-- Main Content -->
-        <StackPanel VerticalAlignment="Center" 
-                    Margin="50,0">
-            
-            <!-- Logo -->
-            <Viewbox Width="60" Height="60" Margin="0,0,0,30">
-                <TextBlock Text="🔐" />
-            </Viewbox>
+        <!-- Main Content with ScrollViewer -->
+        <ScrollViewer VerticalScrollBarVisibility="Auto"
+                     HorizontalScrollBarVisibility="Disabled">
+            <StackPanel VerticalAlignment="Center" 
+                        Margin="50,30,50,30"
+                        MinHeight="500">
+                
+                <!-- Logo -->
+                <Viewbox Width="60" Height="60" Margin="0,0,0,30">
+                    <TextBlock Text="🔐" />
+                </Viewbox>
 
-            <!-- Title -->
-            <TextBlock FontSize="28" 
-                     FontWeight="Bold"
-                     HorizontalAlignment="Center"
-                     Margin="0,0,0,10"
-                     Text="Welcome"
-                     Visibility="{Binding IsRegisterMode, Converter={StaticResource InverseBoolToVisibilityConverter}}"/>
-            
-            <TextBlock FontSize="28" 
-                     FontWeight="Bold"
-                     HorizontalAlignment="Center"
-                     Margin="0,0,0,10"
-                     Text="Create Account"
-                     Visibility="{Binding IsRegisterMode, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                <!-- Title -->
+                <TextBlock FontSize="28" 
+                         FontWeight="Bold"
+                         HorizontalAlignment="Center"
+                         Margin="0,0,0,10"
+                         Text="Welcome"
+                         Visibility="{Binding IsRegisterMode, Converter={StaticResource InverseBoolToVisibilityConverter}}"/>
+                
+                <TextBlock FontSize="28" 
+                         FontWeight="Bold"
+                         HorizontalAlignment="Center"
+                         Margin="0,0,0,10"
+                         Text="Create Account"
+                         Visibility="{Binding IsRegisterMode, Converter={StaticResource BoolToVisibilityConverter}}"/>
 
-            <TextBlock Text="Sign in to your vault" 
-                     FontSize="14"
-                     Foreground="#666"
-                     HorizontalAlignment="Center"
-                     Margin="0,0,0,40"
-                     Visibility="{Binding IsRegisterMode, Converter={StaticResource InverseBoolToVisibilityConverter}}"/>
+                <TextBlock Text="Sign in to your vault" 
+                         FontSize="14"
+                         Foreground="#666"
+                         HorizontalAlignment="Center"
+                         Margin="0,0,0,30"
+                         Visibility="{Binding IsRegisterMode, Converter={StaticResource InverseBoolToVisibilityConverter}}"/>
 
-            <TextBlock Text="Create your secure vault" 
-                     FontSize="14"
-                     Foreground="#666"
-                     HorizontalAlignment="Center"
-                     Margin="0,0,0,40"
-                     Visibility="{Binding IsRegisterMode, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                <TextBlock Text="Create your secure vault" 
+                         FontSize="14"
+                         Foreground="#666"
+                         HorizontalAlignment="Center"
+                         Margin="0,0,0,30"
+                         Visibility="{Binding IsRegisterMode, Converter={StaticResource BoolToVisibilityConverter}}"/>
 
-            <!-- Email Field -->
-            <TextBlock Text="Email" 
-                     FontSize="13" 
-                     Foreground="#333"
-                     Margin="0,0,0,8"/>
-            <Border BorderBrush="#DDD" 
-                    BorderThickness="1" 
-                    CornerRadius="4"
-                    Margin="0,0,0,20">
-                <TextBox Text="{Binding Email, UpdateSourceTrigger=PropertyChanged}"
-                       BorderThickness="0"
-                       Padding="12,10"
-                       FontSize="14"
-                       VerticalContentAlignment="Center"/>
-            </Border>
-
-            <!-- Master Password Field -->
-            <TextBlock Text="Master Password" 
-                     FontSize="13" 
-                     Foreground="#333"
-                     Margin="0,0,0,8"/>
-            <Border BorderBrush="#DDD" 
-                    BorderThickness="1" 
-                    CornerRadius="4"
-                    Margin="0,0,0,20">
-                <PasswordBox x:Name="MasterPasswordBox"
-                           BorderThickness="0"
-                           Padding="12,10"
-                           FontSize="14"
-                           VerticalContentAlignment="Center"
-                           PasswordChanged="MasterPasswordBox_PasswordChanged"/>
-            </Border>
-
-            <!-- Confirm Password (Register Mode) -->
-            <StackPanel Visibility="{Binding IsRegisterMode, Converter={StaticResource BoolToVisibilityConverter}}">
-                <TextBlock Text="Confirm Password" 
+                <!-- Email Field -->
+                <TextBlock Text="Email" 
                          FontSize="13" 
                          Foreground="#333"
                          Margin="0,0,0,8"/>
                 <Border BorderBrush="#DDD" 
                         BorderThickness="1" 
                         CornerRadius="4"
-                        Margin="0,0,0,10">
-                    <PasswordBox x:Name="ConfirmPasswordBox"
+                        Margin="0,0,0,20">
+                    <TextBox Text="{Binding Email, UpdateSourceTrigger=PropertyChanged}"
+                           BorderThickness="0"
+                           Padding="12,10"
+                           FontSize="14"
+                           VerticalContentAlignment="Center"/>
+                </Border>
+
+                <!-- Master Password Field -->
+                <TextBlock Text="Master Password" 
+                         FontSize="13" 
+                         Foreground="#333"
+                         Margin="0,0,0,8"/>
+                <Border BorderBrush="#DDD" 
+                        BorderThickness="1" 
+                        CornerRadius="4"
+                        Margin="0,0,0,20">
+                    <PasswordBox x:Name="MasterPasswordBox"
                                BorderThickness="0"
                                Padding="12,10"
                                FontSize="14"
                                VerticalContentAlignment="Center"
-                               PasswordChanged="ConfirmPasswordBox_PasswordChanged"/>
+                               PasswordChanged="MasterPasswordBox_PasswordChanged"/>
                 </Border>
 
-                <!-- Password Strength -->
-                <Grid Margin="0,0,0,20">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-                    
-                    <ProgressBar Grid.Column="0" 
-                               Value="{Binding PasswordStrengthScore}" 
-                               Maximum="100"
-                               Height="4"
-                               Foreground="{Binding PasswordStrengthColor}"
-                               Margin="0,0,10,0"/>
-                    
-                    <TextBlock Grid.Column="1"
-                             Text="{Binding PasswordStrengthText}" 
-                             FontSize="11"
-                             Foreground="{Binding PasswordStrengthColor}"
-                             VerticalAlignment="Center"/>
-                </Grid>
-            </StackPanel>
+                <!-- Confirm Password (Register Mode) -->
+                <StackPanel Visibility="{Binding IsRegisterMode, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <TextBlock Text="Confirm Password" 
+                             FontSize="13" 
+                             Foreground="#333"
+                             Margin="0,0,0,8"/>
+                    <Border BorderBrush="#DDD" 
+                            BorderThickness="1" 
+                            CornerRadius="4"
+                            Margin="0,0,0,10">
+                        <PasswordBox x:Name="ConfirmPasswordBox"
+                                   BorderThickness="0"
+                                   Padding="12,10"
+                                   FontSize="14"
+                                   VerticalContentAlignment="Center"
+                                   PasswordChanged="ConfirmPasswordBox_PasswordChanged"/>
+                    </Border>
 
-            <!-- Error Message -->
-            <Border Background="#FFEBEE"
-                    BorderBrush="#F44336"
-                    BorderThickness="1"
-                    CornerRadius="4"
-                    Padding="12,10"
-                    Margin="0,0,0,20"
-                    Visibility="{Binding ErrorMessage, Converter={StaticResource NullToVisibilityConverter}}">
-                <TextBlock Text="{Binding ErrorMessage}" 
-                         Foreground="#D32F2F"
-                         FontSize="12"
-                         TextWrapping="Wrap"/>
-            </Border>
-
-            <!-- Login Button -->
-            <Button Command="{Binding LoginCommand}"
-                  Background="#1976D2"
-                  Foreground="White"
-                  Padding="0,14"
-                  FontSize="15"
-                  FontWeight="SemiBold"
-                  BorderThickness="0"
-                  Cursor="Hand"
-                  Margin="0,0,0,15"
-                  Visibility="{Binding IsRegisterMode, Converter={StaticResource InverseBoolToVisibilityConverter}}">
-                <Button.Style>
-                    <Style TargetType="Button">
-                        <Setter Property="Background" Value="#1976D2"/>
-                        <Setter Property="Template">
-                            <Setter.Value>
-                                <ControlTemplate TargetType="Button">
-                                    <Border Background="{TemplateBinding Background}" 
-                                            CornerRadius="4"
-                                            Padding="{TemplateBinding Padding}">
-                                        <ContentPresenter HorizontalAlignment="Center" 
-                                                        VerticalAlignment="Center"/>
-                                    </Border>
-                                </ControlTemplate>
-                            </Setter.Value>
-                        </Setter>
-                        <Style.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Background" Value="#1565C0"/>
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter Property="Background" Value="#BDBDBD"/>
-                            </Trigger>
-                        </Style.Triggers>
-                    </Style>
-                </Button.Style>
-                <TextBlock Text="Sign In"/>
-            </Button>
-
-            <!-- Register Button -->
-            <Button Command="{Binding RegisterCommand}"
-                  Background="#1976D2"
-                  Foreground="White"
-                  Padding="0,14"
-                  FontSize="15"
-                  FontWeight="SemiBold"
-                  BorderThickness="0"
-                  Cursor="Hand"
-                  Margin="0,0,0,15"
-                  Visibility="{Binding IsRegisterMode, Converter={StaticResource BoolToVisibilityConverter}}">
-                <Button.Style>
-                    <Style TargetType="Button">
-                        <Setter Property="Background" Value="#1976D2"/>
-                        <Setter Property="Template">
-                            <Setter.Value>
-                                <ControlTemplate TargetType="Button">
-                                    <Border Background="{TemplateBinding Background}" 
-                                            CornerRadius="4"
-                                            Padding="{TemplateBinding Padding}">
-                                        <ContentPresenter HorizontalAlignment="Center" 
-                                                        VerticalAlignment="Center"/>
-                                    </Border>
-                                </ControlTemplate>
-                            </Setter.Value>
-                        </Setter>
-                        <Style.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Background" Value="#1565C0"/>
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter Property="Background" Value="#BDBDBD"/>
-                            </Trigger>
-                        </Style.Triggers>
-                    </Style>
-                </Button.Style>
-                <TextBlock Text="Create Account"/>
-            </Button>
-
-            <!-- Toggle Mode -->
-            <Button Command="{Binding ToggleModeCommand}"
-                  Background="Transparent"
-                  Foreground="#1976D2"
-                  BorderThickness="0"
-                  Cursor="Hand"
-                  HorizontalAlignment="Center"
-                  Padding="10,8">
-                <Button.Style>
-                    <Style TargetType="Button">
-                        <Setter Property="Template">
-                            <Setter.Value>
-                                <ControlTemplate TargetType="Button">
-                                    <ContentPresenter/>
-                                </ControlTemplate>
-                            </Setter.Value>
-                        </Setter>
-                        <Style.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="TextBlock.TextDecorations" Value="Underline"/>
-                            </Trigger>
-                        </Style.Triggers>
-                    </Style>
-                </Button.Style>
-                <StackPanel>
-                    <TextBlock FontSize="13" 
-                             Visibility="{Binding IsRegisterMode, Converter={StaticResource InverseBoolToVisibilityConverter}}">
-                        <Run Text="Don't have an account? " Foreground="#666"/>
-                        <Run Text="Sign up" FontWeight="SemiBold"/>
-                    </TextBlock>
-                    
-                    <TextBlock FontSize="13"
-                             Visibility="{Binding IsRegisterMode, Converter={StaticResource BoolToVisibilityConverter}}">
-                        <Run Text="Already have an account? " Foreground="#666"/>
-                        <Run Text="Sign in" FontWeight="SemiBold"/>
-                    </TextBlock>
+                    <!-- Password Strength -->
+                    <Grid Margin="0,0,0,20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        
+                        <ProgressBar Grid.Column="0" 
+                                   Value="{Binding PasswordStrengthScore}" 
+                                   Maximum="100"
+                                   Height="4"
+                                   Foreground="{Binding PasswordStrengthColor}"
+                                   Margin="0,0,10,0"/>
+                        
+                        <TextBlock Grid.Column="1"
+                                 Text="{Binding PasswordStrengthText}" 
+                                 FontSize="11"
+                                 Foreground="{Binding PasswordStrengthColor}"
+                                 VerticalAlignment="Center"/>
+                    </Grid>
                 </StackPanel>
-            </Button>
-        </StackPanel>
+
+                <!-- Error Message -->
+                <Border Background="#FFEBEE"
+                        BorderBrush="#F44336"
+                        BorderThickness="1"
+                        CornerRadius="4"
+                        Padding="12,10"
+                        Margin="0,0,0,20"
+                        MaxHeight="120">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding ErrorMessage}" Value="{x:Null}">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding ErrorMessage}" Value="">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    
+                    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                 MaxHeight="100">
+                        <TextBlock Text="{Binding ErrorMessage}" 
+                                 Foreground="#D32F2F"
+                                 FontSize="12"
+                                 TextWrapping="Wrap"/>
+                    </ScrollViewer>
+                </Border>
+
+                <!-- Login Button -->
+                <Button Command="{Binding LoginCommand}"
+                      Background="#1976D2"
+                      Foreground="White"
+                      Padding="0,14"
+                      FontSize="15"
+                      FontWeight="SemiBold"
+                      BorderThickness="0"
+                      Cursor="Hand"
+                      Margin="0,0,0,15"
+                      Visibility="{Binding IsRegisterMode, Converter={StaticResource InverseBoolToVisibilityConverter}}">
+                    <Button.Style>
+                        <Style TargetType="Button">
+                            <Setter Property="Background" Value="#1976D2"/>
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border Background="{TemplateBinding Background}" 
+                                                CornerRadius="4"
+                                                Padding="{TemplateBinding Padding}">
+                                            <ContentPresenter HorizontalAlignment="Center" 
+                                                            VerticalAlignment="Center"/>
+                                        </Border>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                            <Style.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="Background" Value="#1565C0"/>
+                                </Trigger>
+                                <Trigger Property="IsEnabled" Value="False">
+                                    <Setter Property="Background" Value="#BDBDBD"/>
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                    <TextBlock Text="Sign In"/>
+                </Button>
+
+                <!-- Register Button -->
+                <Button Command="{Binding RegisterCommand}"
+                      Background="#1976D2"
+                      Foreground="White"
+                      Padding="0,14"
+                      FontSize="15"
+                      FontWeight="SemiBold"
+                      BorderThickness="0"
+                      Cursor="Hand"
+                      Margin="0,0,0,15"
+                      Visibility="{Binding IsRegisterMode, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <Button.Style>
+                        <Style TargetType="Button">
+                            <Setter Property="Background" Value="#1976D2"/>
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border Background="{TemplateBinding Background}" 
+                                                CornerRadius="4"
+                                                Padding="{TemplateBinding Padding}">
+                                            <ContentPresenter HorizontalAlignment="Center" 
+                                                            VerticalAlignment="Center"/>
+                                        </Border>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                            <Style.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="Background" Value="#1565C0"/>
+                                </Trigger>
+                                <Trigger Property="IsEnabled" Value="False">
+                                    <Setter Property="Background" Value="#BDBDBD"/>
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                    <TextBlock Text="Create Account"/>
+                </Button>
+
+                <!-- Toggle Mode -->
+                <Button Command="{Binding ToggleModeCommand}"
+                      Background="Transparent"
+                      Foreground="#1976D2"
+                      BorderThickness="0"
+                      Cursor="Hand"
+                      HorizontalAlignment="Center"
+                      Padding="10,8"
+                      Margin="0,0,0,20">
+                    <Button.Style>
+                        <Style TargetType="Button">
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="Button">
+                                        <ContentPresenter/>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                            <Style.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="TextBlock.TextDecorations" Value="Underline"/>
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                    <StackPanel>
+                        <TextBlock FontSize="13" 
+                                 Visibility="{Binding IsRegisterMode, Converter={StaticResource InverseBoolToVisibilityConverter}}">
+                            <Run Text="Don't have an account? " Foreground="#666"/>
+                            <Run Text="Sign up" FontWeight="SemiBold"/>
+                        </TextBlock>
+                        
+                        <TextBlock FontSize="13"
+                                 Visibility="{Binding IsRegisterMode, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <Run Text="Already have an account? " Foreground="#666"/>
+                            <Run Text="Sign in" FontWeight="SemiBold"/>
+                        </TextBlock>
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </ScrollViewer>
     </Grid>
 </Window>

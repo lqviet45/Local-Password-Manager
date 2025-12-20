@@ -5,6 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:viewmodels="clr-namespace:PasswordManager.Desktop.ViewModels"
         xmlns:views="clr-namespace:PasswordManager.Desktop.Views"
+        xmlns:converters="clr-namespace:PasswordManager.Desktop.Converters"
         d:DataContext="{d:DesignInstance Type=viewmodels:MainViewModel}"
         mc:Ignorable="d"
         Title="{Binding Title}" 
@@ -15,6 +16,11 @@
         Loaded="Window_Loaded">
 
     <Window.Resources>
+        <!-- Local Converters (in case global ones don't load) -->
+        <converters:BoolToVisibilityConverter x:Key="LocalBoolToVisibilityConverter"/>
+        <converters:InverseBoolToVisibilityConverter x:Key="LocalInverseBoolToVisibilityConverter"/>
+        <converters:PremiumTextConverter x:Key="LocalPremiumTextConverter"/>
+        
         <!-- DataTemplates for ViewModels -->
         <DataTemplate DataType="{x:Type viewmodels:VaultViewModel}">
             <views:VaultView />
@@ -55,13 +61,6 @@
                 </DataTrigger>
             </Style.Triggers>
         </Style>
-
-        <!-- Active Nav Button Style -->
-        <Style x:Key="ActiveNavButton" TargetType="Button" BasedOn="{StaticResource NavButton}">
-            <Setter Property="Background" Value="#1976D2"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-        </Style>
     </Window.Resources>
 
     <Grid>
@@ -97,16 +96,28 @@
                                  FontSize="12"
                                  HorizontalAlignment="Center"
                                  Margin="0,5,0,0"/>
-                        <Border Background="#FFC107"
-                                CornerRadius="10"
-                                Padding="8,3"
-                                HorizontalAlignment="Center"
-                                Margin="0,5,0,0"
-                                Visibility="{Binding IsPremium, Converter={StaticResource BoolToVisibilityConverter}}">
-                            <TextBlock Text="⭐ PREMIUM" 
-                                     Foreground="White"
-                                     FontSize="10"
-                                     FontWeight="Bold"/>
+                        
+                        <!-- Premium Badge -->
+                        <Border Margin="0,5,0,0"
+                                HorizontalAlignment="Center">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsPremium}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                            <Border Background="#FFC107"
+                                    CornerRadius="10"
+                                    Padding="8,3">
+                                <TextBlock Text="⭐ PREMIUM" 
+                                         Foreground="White"
+                                         FontSize="10"
+                                         FontWeight="Bold"/>
+                            </Border>
                         </Border>
                     </StackPanel>
                 </Border>
@@ -167,9 +178,75 @@
 
         <!-- Main Content Area -->
         <Border Grid.Column="1" 
-                Background="#FAFAFA"
-                Padding="0">
-            <ContentControl Content="{Binding CurrentViewModel}"/>
+                Background="#FAFAFA">
+            
+            <!-- Debug panel - Remove after testing -->
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                
+                <!-- Debug Info -->
+                <Border Grid.Row="0" 
+                        Background="#FFF3E0" 
+                        BorderBrush="#FF9800"
+                        BorderThickness="0,0,0,1"
+                        Padding="10">
+                    <StackPanel>
+                        <TextBlock FontSize="11" Foreground="#E65100">
+                            <Run Text="DEBUG:"/>
+                            <Run Text="CurrentViewModel: "/>
+                            <Run Text="{Binding CurrentViewModel, FallbackValue='NULL'}" FontWeight="Bold"/>
+                        </TextBlock>
+                        <TextBlock FontSize="11" Foreground="#E65100" Margin="0,2,0,0">
+                            <Run Text="User: "/>
+                            <Run Text="{Binding UserEmail, FallbackValue='Not Set'}" FontWeight="Bold"/>
+                        </TextBlock>
+                    </StackPanel>
+                </Border>
+                
+                <!-- Actual Content -->
+                <ContentControl Grid.Row="1" 
+                                Content="{Binding CurrentViewModel}"
+                                Margin="0">
+                    <!-- Fallback content if DataTemplate doesn't work -->
+                    <ContentControl.Style>
+                        <Style TargetType="ContentControl">
+                            <Style.Triggers>
+                                <Trigger Property="Content" Value="{x:Null}">
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate>
+                                                <Border Background="White" 
+                                                        Padding="40"
+                                                        Margin="20">
+                                                    <StackPanel HorizontalAlignment="Center" 
+                                                              VerticalAlignment="Center">
+                                                        <TextBlock Text="⚠️" 
+                                                                 FontSize="48" 
+                                                                 HorizontalAlignment="Center"
+                                                                 Margin="0,0,0,20"/>
+                                                        <TextBlock Text="No Content Loaded" 
+                                                                 FontSize="20" 
+                                                                 FontWeight="SemiBold"
+                                                                 HorizontalAlignment="Center"
+                                                                 Margin="0,0,0,10"/>
+                                                        <TextBlock Text="CurrentViewModel is null" 
+                                                                 FontSize="14" 
+                                                                 Foreground="Gray"
+                                                                 HorizontalAlignment="Center"/>
+                                                    </StackPanel>
+                                                </Border>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ContentControl.Style>
+                </ContentControl>
+            </Grid>
         </Border>
     </Grid>
 </Window>

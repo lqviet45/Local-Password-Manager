@@ -49,23 +49,40 @@ public partial class MainViewModel : ViewModelBase
 
         Title = "Password Manager";
 
+        // DEBUG LOGGING
+        Logger.LogInformation("=== MainViewModel Constructor ===");
+        Logger.LogInformation("VaultViewModel Type: {Type}", VaultViewModel.GetType().Name);
+        Logger.LogInformation("SettingsViewModel Type: {Type}", SettingsViewModel.GetType().Name);
+
         // Initialize user info
         if (_sessionService.CurrentUser != null)
         {
             UserEmail = _sessionService.CurrentUser.Email;
             IsPremium = _sessionService.CurrentUser.IsPremium;
+            Logger.LogInformation("Current User: {Email}, Premium: {IsPremium}", UserEmail, IsPremium);
+        }
+        else
+        {
+            Logger.LogWarning("No current user in session!");
         }
 
-        // Set default view
+        // Set default view - CRITICAL!
         CurrentViewModel = VaultViewModel;
+        Logger.LogInformation("CurrentViewModel set to: {Type}", CurrentViewModel?.GetType().Name ?? "NULL");
 
         // Subscribe to session events
         _sessionService.SessionEnding += OnSessionEnding;
     }
 
+    partial void OnCurrentViewModelChanged(ViewModelBase? value)
+    {
+        Logger.LogInformation("CurrentViewModel changed to: {Type}", value?.GetType().Name ?? "NULL");
+    }
+
     [RelayCommand]
     private void NavigateToVault()
     {
+        Logger.LogInformation("Navigating to Vault");
         CurrentViewModel = VaultViewModel;
         SelectedNavItem = "Vault";
     }
@@ -73,6 +90,7 @@ public partial class MainViewModel : ViewModelBase
     [RelayCommand]
     private void NavigateToSettings()
     {
+        Logger.LogInformation("Navigating to Settings");
         CurrentViewModel = SettingsViewModel;
         SelectedNavItem = "Settings";
     }

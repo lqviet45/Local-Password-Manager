@@ -363,14 +363,61 @@ public partial class LoginViewModel : ViewModelBase
     }
 
     private void OpenMainWindow()
+{
+    try
     {
+        Logger.LogInformation("=== Opening Main Window ===");
+        Logger.LogInformation("Creating MainWindow via WindowFactory...");
+        
         var mainWindow = _windowFactory.CreateMainWindow();
+        
+        Logger.LogInformation("MainWindow created. Type: {Type}", mainWindow.GetType().Name);
+        Logger.LogInformation("MainWindow.DataContext Type: {Type}", 
+            mainWindow.DataContext?.GetType().Name ?? "NULL");
+        
+        // Verify MainViewModel setup
+        if (mainWindow.DataContext is MainViewModel mainViewModel)
+        {
+            Logger.LogInformation("✓ DataContext is MainViewModel");
+            Logger.LogInformation("MainViewModel.CurrentViewModel: {Type}", 
+                mainViewModel.CurrentViewModel?.GetType().Name ?? "NULL");
+            Logger.LogInformation("MainViewModel.VaultViewModel: {Type}",
+                mainViewModel.VaultViewModel?.GetType().Name ?? "NULL");
+            Logger.LogInformation("MainViewModel.UserEmail: {Email}", mainViewModel.UserEmail);
+            
+            if (mainViewModel.CurrentViewModel == null)
+            {
+                Logger.LogWarning("⚠ CurrentViewModel is NULL! Setting to VaultViewModel");
+                mainViewModel.CurrentViewModel = mainViewModel.VaultViewModel;
+            }
+        }
+        else
+        {
+            Logger.LogError("❌ MainWindow.DataContext is NOT MainViewModel!");
+            Logger.LogError("DataContext actual type: {Type}", 
+                mainWindow.DataContext?.GetType().FullName ?? "NULL");
+            
+            ShowError("Failed to initialize main window properly. Please check logs.");
+            return;
+        }
+        
+        Logger.LogInformation("Showing MainWindow...");
         mainWindow.Show();
+        Logger.LogInformation("MainWindow shown successfully");
 
         // Close login window
+        Logger.LogInformation("Closing LoginWindow...");
         Application.Current.Windows
             .OfType<Window>()
             .FirstOrDefault(w => w.DataContext == this)
             ?.Close();
+        
+        Logger.LogInformation("=== Main Window Opened Successfully ===");
     }
+    catch (Exception ex)
+    {
+        Logger.LogError(ex, "Failed to open main window");
+        ShowError($"Failed to open application: {ex.Message}");
+    }
+}
 }
