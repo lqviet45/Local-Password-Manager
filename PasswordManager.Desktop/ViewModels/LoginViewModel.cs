@@ -23,29 +23,21 @@ public partial class LoginViewModel : ViewModelBase
     private readonly IPasswordStrengthService _passwordStrengthService;
     private readonly IWindowFactory _windowFactory;
 
-    [ObservableProperty]
-    private string _email = string.Empty;
+    [ObservableProperty] private string _email = string.Empty;
 
-    [ObservableProperty]
-    private string _masterPassword = string.Empty;
+    [ObservableProperty] private string _masterPassword = string.Empty;
 
-    [ObservableProperty]
-    private string _confirmPassword = string.Empty;
+    [ObservableProperty] private string _confirmPassword = string.Empty;
 
-    [ObservableProperty]
-    private bool _isRegisterMode;
+    [ObservableProperty] private bool _isRegisterMode;
 
-    [ObservableProperty]
-    private string _passwordStrengthText = string.Empty;
+    [ObservableProperty] private string _passwordStrengthText = string.Empty;
 
-    [ObservableProperty]
-    private string _passwordStrengthColor = "Gray";
+    [ObservableProperty] private string _passwordStrengthColor = "Gray";
 
-    [ObservableProperty]
-    private int _passwordStrengthScore;
+    [ObservableProperty] private int _passwordStrengthScore;
 
-    [ObservableProperty]
-    private bool _showPassword;
+    [ObservableProperty] private bool _showPassword;
 
     public LoginViewModel(
         VaultDbContext dbContext,
@@ -60,9 +52,11 @@ public partial class LoginViewModel : ViewModelBase
     {
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _cryptoProvider = cryptoProvider ?? throw new ArgumentNullException(nameof(cryptoProvider));
-        _masterPasswordService = masterPasswordService ?? throw new ArgumentNullException(nameof(masterPasswordService));
+        _masterPasswordService =
+            masterPasswordService ?? throw new ArgumentNullException(nameof(masterPasswordService));
         _sessionService = sessionService ?? throw new ArgumentNullException(nameof(sessionService));
-        _passwordStrengthService = passwordStrengthService ?? throw new ArgumentNullException(nameof(passwordStrengthService));
+        _passwordStrengthService =
+            passwordStrengthService ?? throw new ArgumentNullException(nameof(passwordStrengthService));
         _windowFactory = windowFactory ?? throw new ArgumentNullException(nameof(windowFactory));
 
         Title = "Password Manager - Login";
@@ -76,6 +70,7 @@ public partial class LoginViewModel : ViewModelBase
 
         await ExecuteAsync(async () =>
         {
+            Logger.LogInformation("=== LOGIN ATTEMPT START ===");
             Logger.LogInformation("Attempting login for user: {Email}", Email);
 
             // Get user from database
@@ -87,6 +82,16 @@ public partial class LoginViewModel : ViewModelBase
                 throw new InvalidOperationException("Invalid email or master password");
             }
 
+            // ✅ DEBUG: Log salt information
+            Logger.LogInformation("User found in database:");
+            Logger.LogInformation("  - User ID: {UserId}", user.Id);
+            Logger.LogInformation("  - Email: {Email}", user.Email);
+            Logger.LogInformation("  - Salt length: {SaltLength} bytes", user.Salt?.Length ?? 0);
+            Logger.LogInformation("  - Salt (first 8 bytes): {SaltPrefix}",
+                user.Salt != null && user.Salt.Length >= 8
+                    ? Convert.ToHexString(user.Salt[..8])
+                    : "NULL or TOO SHORT");
+
             // Check if account is locked
             if (user.IsLocked)
             {
@@ -95,16 +100,19 @@ public partial class LoginViewModel : ViewModelBase
             }
 
             // Verify master password
+            Logger.LogInformation("Verifying master password...");
             var isValid = await _masterPasswordService.VerifyMasterPasswordAsync(
-                MasterPassword, 
+                MasterPassword,
                 user.MasterPasswordHash);
 
             if (!isValid)
             {
-                // Increment failed attempts
+                Logger.LogWarning("Password verification FAILED");
                 await IncrementFailedLoginAttemptsAsync(user);
                 throw new InvalidOperationException("Invalid email or master password");
             }
+
+            Logger.LogInformation("✓ Password verification SUCCESS");
 
             // Reset failed attempts on successful login
             if (user.FailedLoginAttempts > 0)
@@ -112,22 +120,52 @@ public partial class LoginViewModel : ViewModelBase
                 user.FailedLoginAttempts = 0;
                 user.LastFailedLoginUtc = null;
                 user.LastLoginUtc = DateTime.UtcNow;
-                
+
                 _dbContext.Users.Update(user);
                 await _dbContext.SaveChangesAsync();
             }
 
-            // Initialize master password service with encryption key
-            await _masterPasswordService.InitializeAsync(MasterPassword);
+            // ✅ CRITICAL FIX: Initialize with user's salt
+            Logger.LogInformation("=== INITIALIZING MASTER PASSWORD SERVICE ===");
+            Logger.LogInformation("Salt length: {Length} bytes", user.Salt.Length);
+            Logger.LogInformation("Salt (first 16 bytes hex): {SaltHex}",
+                Convert.ToHexString(user.Salt[..Math.Min(16, user.Salt.Length)]));
+
+            // Check current state before initialization
+            Logger.LogInformation("MasterPasswordService.IsInitialized BEFORE: {IsInitialized}",
+                _masterPasswordService.IsInitialized);
+
+            await _masterPasswordService.InitializeAsync(MasterPassword, user.Salt);
+
+            // Check state after initialization
+            Logger.LogInformation("MasterPasswordService.IsInitialized AFTER: {IsInitialized}",
+                _masterPasswordService.IsInitialized);
+
+            // ✅ VERIFY: Try to get encryption key to confirm initialization
+            try
+            {
+                var testKey = _masterPasswordService.GetEncryptionKey();
+                Logger.LogInformation("✓ Encryption key retrieved successfully (length: {Length} bytes)",
+                    testKey.Length);
+                Logger.LogInformation("  Key (first 16 bytes hex): {KeyHex}",
+                    Convert.ToHexString(testKey[..Math.Min(16, testKey.Length)]));
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "❌ FAILED to get encryption key after initialization!");
+                throw;
+            }
+
+            Logger.LogInformation("=== MASTER PASSWORD SERVICE INITIALIZED ===");
 
             // Start user session
             _sessionService.StartSession(user);
 
             Logger.LogInformation("Login successful for user: {Email}", Email);
+            Logger.LogInformation("=== LOGIN ATTEMPT END - SUCCESS ===");
 
             // Open main window
             OpenMainWindow();
-
         }, "Login failed. Please check your credentials.");
     }
 
@@ -200,7 +238,6 @@ public partial class LoginViewModel : ViewModelBase
             IsRegisterMode = false;
             MasterPassword = string.Empty;
             ConfirmPassword = string.Empty;
-
         }, "Registration failed. Please try again.");
     }
 
@@ -234,7 +271,7 @@ public partial class LoginViewModel : ViewModelBase
     private void UpdatePasswordStrength(string password)
     {
         var analysis = _passwordStrengthService.AnalyzePassword(password);
-        
+
         PasswordStrengthScore = analysis.Score;
         PasswordStrengthText = analysis.Level switch
         {
@@ -348,7 +385,7 @@ public partial class LoginViewModel : ViewModelBase
     {
         var failedAttempts = user.FailedLoginAttempts + 1;
         var isLocked = failedAttempts >= 5;
-        
+
         user.FailedLoginAttempts = failedAttempts;
         user.LastFailedLoginUtc = DateTime.UtcNow;
         user.IsLocked = isLocked;
@@ -367,17 +404,17 @@ public partial class LoginViewModel : ViewModelBase
         try
         {
             Logger.LogInformation("=== Opening Main Window ===");
-        
+
             var mainWindow = _windowFactory.CreateMainWindow();
-        
+
             Logger.LogInformation("✓ MainWindow created successfully");
-            Logger.LogInformation("  - DataContext Type: {Type}", 
+            Logger.LogInformation("  - DataContext Type: {Type}",
                 mainWindow.DataContext?.GetType().Name ?? "NULL");
-        
+
             if (mainWindow.DataContext is MainViewModel mainViewModel)
             {
                 Logger.LogInformation("✓ DataContext is MainViewModel");
-                Logger.LogInformation("  - CurrentViewModel: {Type}", 
+                Logger.LogInformation("  - CurrentViewModel: {Type}",
                     mainViewModel.CurrentViewModel?.GetType().Name ?? "NULL");
                 Logger.LogInformation("  - UserEmail: {Email}", mainViewModel.UserEmail);
             }
@@ -387,7 +424,7 @@ public partial class LoginViewModel : ViewModelBase
                 ShowError("Failed to initialize main window. Please check logs.");
                 return;
             }
-        
+
             mainWindow.Show();
             Logger.LogInformation("✓ MainWindow displayed");
 
@@ -396,7 +433,7 @@ public partial class LoginViewModel : ViewModelBase
                 .OfType<Window>()
                 .FirstOrDefault(w => w.DataContext == this)
                 ?.Close();
-        
+
             Logger.LogInformation("=== Login window closed ===");
         }
         catch (Exception ex)

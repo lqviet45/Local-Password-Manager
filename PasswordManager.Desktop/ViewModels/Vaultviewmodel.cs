@@ -109,21 +109,17 @@ public partial class VaultViewModel : ViewModelBase
                 DialogService,
                 App.ServiceProvider.GetRequiredService<ILogger<AddEditItemViewModel>>());
 
-            // Initialize for creating new item
-            addEditViewModel.InitializeForCreate((savedItem) =>
+            // Initialize with callback that refreshes vault
+            addEditViewModel.InitializeForCreate(async (savedItem) =>
             {
-                Logger.LogInformation("Item saved callback: {ItemId}", savedItem.Id);
+                Logger.LogInformation("Item created: {ItemId}, triggering vault refresh", savedItem.Id);
+                // Note: This callback might not be needed anymore since we refresh in ShowDialog check
             });
 
             // Find the actual MainWindow
             var mainWindow = System.Windows.Application.Current.Windows
                 .OfType<System.Windows.Window>()
                 .FirstOrDefault(w => w.DataContext is MainViewModel);
-
-            if (mainWindow == null)
-            {
-                Logger.LogWarning("Could not find MainWindow, creating window without owner");
-            }
 
             // Create and show window
             var window = new PasswordManager.Desktop.Views.AddEditItemWindow(addEditViewModel);
@@ -141,15 +137,14 @@ public partial class VaultViewModel : ViewModelBase
             Logger.LogInformation("Showing AddEditItemWindow...");
             var result = window.ShowDialog();
 
+            // ALWAYS refresh after dialog closes (whether success or cancel)
+            // This ensures the vault is in sync with the database
+            Logger.LogInformation("Dialog closed with result: {Result}, refreshing vault", result);
+            await LoadItemsAsync();
+
             if (result == true)
             {
-                Logger.LogInformation("Dialog closed with success, refreshing vault");
-                await LoadItemsAsync();
                 ShowInfo("Item added successfully!");
-            }
-            else
-            {
-                Logger.LogInformation("Dialog cancelled by user");
             }
         }
         catch (Exception ex)
@@ -185,9 +180,12 @@ public partial class VaultViewModel : ViewModelBase
                 DialogService,
                 App.ServiceProvider.GetRequiredService<ILogger<AddEditItemViewModel>>());
 
-            // Initialize for editing - IMPORTANT: await this!
+            // Initialize for editing with callback
             await addEditViewModel.InitializeForEditAsync(itemToEdit.VaultItem,
-                (updatedItem) => { Logger.LogInformation("Item updated callback: {ItemId}", updatedItem.Id); });
+                (updatedItem) =>
+                {
+                    Logger.LogInformation("Item updated: {ItemId}, triggering vault refresh", updatedItem.Id);
+                });
 
             // Find the actual MainWindow
             var mainWindow = System.Windows.Application.Current.Windows
@@ -210,15 +208,13 @@ public partial class VaultViewModel : ViewModelBase
             Logger.LogInformation("Showing AddEditItemWindow for edit...");
             var result = window.ShowDialog();
 
+            // ALWAYS refresh after dialog closes
+            Logger.LogInformation("Edit dialog closed with result: {Result}, refreshing vault", result);
+            await LoadItemsAsync();
+
             if (result == true)
             {
-                Logger.LogInformation("Edit dialog closed with success, refreshing vault");
-                await LoadItemsAsync();
                 ShowInfo("Item updated successfully!");
-            }
-            else
-            {
-                Logger.LogInformation("Edit dialog cancelled by user");
             }
         }
         catch (Exception ex)
@@ -247,10 +243,10 @@ public partial class VaultViewModel : ViewModelBase
         await ExecuteAsync(async () =>
         {
             await _vaultRepository.DeleteAsync(itemToDelete.Id);
-            VaultItems.Remove(itemToDelete);
 
-            UpdateCounts();
-            ApplyFilters();
+            // Refresh from database instead of just removing from collection
+            // This ensures we have the latest state
+            await LoadItemsAsync();
 
             ShowInfo("Item deleted successfully");
             Logger.LogInformation("Deleted vault item: {ItemId}", itemToDelete.Id);

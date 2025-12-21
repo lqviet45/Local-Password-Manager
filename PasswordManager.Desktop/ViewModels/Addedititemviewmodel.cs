@@ -69,11 +69,13 @@ public partial class AddEditItemViewModel : ViewModelBase
 
     [ObservableProperty]
     private bool _isCheckingBreach;
-    
-    private Action<bool>? _closeWindowAction;
-    
+
     [ObservableProperty]
     private ObservableCollection<VaultItemType> _availableTypes = new();
+
+    // Property to signal successful save
+    [ObservableProperty]
+    private bool _shouldCloseWindow;
 
     public bool IsEditMode => _existingItem != null;
     public string WindowTitle => IsEditMode ? $"Edit {_existingItem!.Name}" : "Add New Item";
@@ -143,14 +145,6 @@ public partial class AddEditItemViewModel : ViewModelBase
         });
     }
 
-    /// <summary>
-    /// Set the action to close the window
-    /// </summary>
-    public void SetCloseWindowAction(Action<bool> closeAction)
-    {
-        _closeWindowAction = closeAction;
-    }
-    
     [RelayCommand]
     private async Task SaveAsync()
     {
@@ -211,8 +205,11 @@ public partial class AddEditItemViewModel : ViewModelBase
             // Callback to parent ViewModel
             _onSaveCallback?.Invoke(savedItem);
 
-            Logger.LogInformation("Save successful, closing window");
-            _closeWindowAction?.Invoke(true);
+            Logger.LogInformation("Save successful, signaling window to close");
+            
+            // Set flag to trigger window close
+            ShouldCloseWindow = true;
+
         }, "Failed to save item");
     }
 

@@ -13,7 +13,7 @@ public interface IMasterPasswordService
     /// Initializes the service with user's master password.
     /// Derives encryption key using Argon2id.
     /// </summary>
-    Task InitializeAsync(string masterPassword);
+    Task InitializeAsync(string masterPassword, byte[] userSalt);
 
     /// <summary>
     /// Gets the derived encryption key for vault operations.
