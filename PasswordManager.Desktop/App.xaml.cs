@@ -67,6 +67,7 @@ public partial class App : Application
 
         // ViewModels - Transient (new instance each time)
         services.AddTransient<LoginViewModel>();
+        services.AddTransient<AddEditItemViewModel>();
         services.AddSingleton<VaultViewModel>();
         services.AddSingleton<SettingsViewModel>();
         services.AddSingleton<MainViewModel>();

@@ -1,8 +1,10 @@
 ﻿using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using PasswordManager.Desktop.Services;
+using PasswordManager.Desktop.Views;
 using PasswordManager.Domain.Entities;
 using PasswordManager.Domain.Enums;
 using PasswordManager.Domain.Interfaces;
@@ -20,32 +22,23 @@ public partial class VaultViewModel : ViewModelBase
     private readonly IMasterPasswordService _masterPasswordService;
     private readonly ICryptoProvider _cryptoProvider;
 
-    [ObservableProperty]
-    private ObservableCollection<VaultItemViewModel> _vaultItems = new();
+    [ObservableProperty] private ObservableCollection<VaultItemViewModel> _vaultItems = new();
 
-    [ObservableProperty]
-    private ObservableCollection<VaultItemViewModel> _filteredItems = new();
+    [ObservableProperty] private ObservableCollection<VaultItemViewModel> _filteredItems = new();
 
-    [ObservableProperty]
-    private VaultItemViewModel? _selectedItem;
+    [ObservableProperty] private VaultItemViewModel? _selectedItem;
 
-    [ObservableProperty]
-    private string _searchText = string.Empty;
+    [ObservableProperty] private string _searchText = string.Empty;
 
-    [ObservableProperty]
-    private VaultItemType? _filterType;
+    [ObservableProperty] private VaultItemType? _filterType;
 
-    [ObservableProperty]
-    private bool _showFavoritesOnly;
+    [ObservableProperty] private bool _showFavoritesOnly;
 
-    [ObservableProperty]
-    private int _totalItemsCount;
+    [ObservableProperty] private int _totalItemsCount;
 
-    [ObservableProperty]
-    private int _loginItemsCount;
+    [ObservableProperty] private int _loginItemsCount;
 
-    [ObservableProperty]
-    private int _noteItemsCount;
+    [ObservableProperty] private int _noteItemsCount;
 
     public VaultViewModel(
         IVaultRepository vaultRepository,
@@ -60,7 +53,8 @@ public partial class VaultViewModel : ViewModelBase
         _vaultRepository = vaultRepository ?? throw new ArgumentNullException(nameof(vaultRepository));
         _sessionService = sessionService ?? throw new ArgumentNullException(nameof(sessionService));
         _clipboardService = clipboardService ?? throw new ArgumentNullException(nameof(clipboardService));
-        _masterPasswordService = masterPasswordService ?? throw new ArgumentNullException(nameof(masterPasswordService));
+        _masterPasswordService =
+            masterPasswordService ?? throw new ArgumentNullException(nameof(masterPasswordService));
         _cryptoProvider = cryptoProvider ?? throw new ArgumentNullException(nameof(cryptoProvider));
 
         Title = "My Vault";
@@ -79,7 +73,7 @@ public partial class VaultViewModel : ViewModelBase
             Logger.LogInformation("Loading vault items for user: {UserId}", _sessionService.CurrentUser.Id);
 
             var items = await _vaultRepository.GetAllAsync(
-                _sessionService.CurrentUser.Id, 
+                _sessionService.CurrentUser.Id,
                 includeDeleted: false);
 
             VaultItems.Clear();
@@ -100,11 +94,69 @@ public partial class VaultViewModel : ViewModelBase
     [RelayCommand]
     private async Task AddNewItemAsync()
     {
-        // TODO: Open AddEditItemViewModel in dialog or navigate
-        ShowInfo("Add new item feature - Coming soon!");
-        
-        // Placeholder for now
-        await Task.CompletedTask;
+        try
+        {
+            Logger.LogInformation("Opening Add Item dialog...");
+
+            // Create AddEditItemViewModel
+            var addEditViewModel = new AddEditItemViewModel(
+                _vaultRepository,
+                _sessionService,
+                _cryptoProvider,
+                _masterPasswordService,
+                App.ServiceProvider.GetRequiredService<IPasswordStrengthService>(),
+                App.ServiceProvider.GetRequiredService<IHibpService>(),
+                DialogService,
+                App.ServiceProvider.GetRequiredService<ILogger<AddEditItemViewModel>>());
+
+            // Initialize for creating new item
+            addEditViewModel.InitializeForCreate((savedItem) =>
+            {
+                Logger.LogInformation("Item saved callback: {ItemId}", savedItem.Id);
+            });
+
+            // Find the actual MainWindow
+            var mainWindow = System.Windows.Application.Current.Windows
+                .OfType<System.Windows.Window>()
+                .FirstOrDefault(w => w.DataContext is MainViewModel);
+
+            if (mainWindow == null)
+            {
+                Logger.LogWarning("Could not find MainWindow, creating window without owner");
+            }
+
+            // Create and show window
+            var window = new PasswordManager.Desktop.Views.AddEditItemWindow(addEditViewModel);
+
+            if (mainWindow != null)
+            {
+                window.Owner = mainWindow;
+                window.WindowStartupLocation = System.Windows.WindowStartupLocation.CenterOwner;
+            }
+            else
+            {
+                window.WindowStartupLocation = System.Windows.WindowStartupLocation.CenterScreen;
+            }
+
+            Logger.LogInformation("Showing AddEditItemWindow...");
+            var result = window.ShowDialog();
+
+            if (result == true)
+            {
+                Logger.LogInformation("Dialog closed with success, refreshing vault");
+                await LoadItemsAsync();
+                ShowInfo("Item added successfully!");
+            }
+            else
+            {
+                Logger.LogInformation("Dialog cancelled by user");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to add new item");
+            ShowError($"Failed to add item: {ex.Message}");
+        }
     }
 
     [RelayCommand]
@@ -117,11 +169,63 @@ public partial class VaultViewModel : ViewModelBase
         }
 
         var itemToEdit = item ?? SelectedItem!;
-        
-        // TODO: Open AddEditItemViewModel with item
-        ShowInfo($"Edit item: {itemToEdit.Name} - Coming soon!");
-        
-        await Task.CompletedTask;
+
+        try
+        {
+            Logger.LogInformation("Opening Edit Item dialog for: {ItemId}", itemToEdit.Id);
+
+            // Create AddEditItemViewModel
+            var addEditViewModel = new AddEditItemViewModel(
+                _vaultRepository,
+                _sessionService,
+                _cryptoProvider,
+                _masterPasswordService,
+                App.ServiceProvider.GetRequiredService<IPasswordStrengthService>(),
+                App.ServiceProvider.GetRequiredService<IHibpService>(),
+                DialogService,
+                App.ServiceProvider.GetRequiredService<ILogger<AddEditItemViewModel>>());
+
+            // Initialize for editing - IMPORTANT: await this!
+            await addEditViewModel.InitializeForEditAsync(itemToEdit.VaultItem,
+                (updatedItem) => { Logger.LogInformation("Item updated callback: {ItemId}", updatedItem.Id); });
+
+            // Find the actual MainWindow
+            var mainWindow = System.Windows.Application.Current.Windows
+                .OfType<System.Windows.Window>()
+                .FirstOrDefault(w => w.DataContext is MainViewModel);
+
+            // Create and show window
+            var window = new PasswordManager.Desktop.Views.AddEditItemWindow(addEditViewModel);
+
+            if (mainWindow != null)
+            {
+                window.Owner = mainWindow;
+                window.WindowStartupLocation = System.Windows.WindowStartupLocation.CenterOwner;
+            }
+            else
+            {
+                window.WindowStartupLocation = System.Windows.WindowStartupLocation.CenterScreen;
+            }
+
+            Logger.LogInformation("Showing AddEditItemWindow for edit...");
+            var result = window.ShowDialog();
+
+            if (result == true)
+            {
+                Logger.LogInformation("Edit dialog closed with success, refreshing vault");
+                await LoadItemsAsync();
+                ShowInfo("Item updated successfully!");
+            }
+            else
+            {
+                Logger.LogInformation("Edit dialog cancelled by user");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to edit item");
+            ShowError($"Failed to edit item: {ex.Message}");
+        }
     }
 
     [RelayCommand]
@@ -144,10 +248,10 @@ public partial class VaultViewModel : ViewModelBase
         {
             await _vaultRepository.DeleteAsync(itemToDelete.Id);
             VaultItems.Remove(itemToDelete);
-            
+
             UpdateCounts();
             ApplyFilters();
-            
+
             ShowInfo("Item deleted successfully");
             Logger.LogInformation("Deleted vault item: {ItemId}", itemToDelete.Id);
         });
@@ -162,10 +266,10 @@ public partial class VaultViewModel : ViewModelBase
         {
             var updatedItem = item.VaultItem with { IsFavorite = !item.IsFavorite };
             await _vaultRepository.UpdateAsync(updatedItem);
-            
+
             item.UpdateFromVaultItem(updatedItem);
             ApplyFilters();
-            
+
             Logger.LogInformation("Toggled favorite for item: {ItemId}", item.Id);
         });
     }
@@ -183,13 +287,13 @@ public partial class VaultViewModel : ViewModelBase
                 var encryptionKey = _masterPasswordService.GetEncryptionKey();
                 var encryptedData = Domain.ValueObjects.EncryptedData.FromCombinedString(item.VaultItem.EncryptedData);
                 var decryptedPassword = await _cryptoProvider.DecryptAsync(encryptedData, encryptionKey);
-                
+
                 item.DecryptedPassword = decryptedPassword;
             }
 
             _clipboardService.CopyToClipboard(item.DecryptedPassword, TimeSpan.FromSeconds(30));
             ShowInfo("Password copied to clipboard (will clear in 30 seconds)");
-            
+
             Logger.LogInformation("Copied password for item: {ItemId}", item.Id);
         });
     }
@@ -262,7 +366,7 @@ public partial class VaultViewModel : ViewModelBase
 
         FilteredItems = new ObservableCollection<VaultItemViewModel>(
             filtered.OrderByDescending(i => i.IsFavorite)
-                    .ThenByDescending(i => i.LastModifiedUtc));
+                .ThenByDescending(i => i.LastModifiedUtc));
     }
 
     private void UpdateCounts()
@@ -296,11 +400,9 @@ public partial class VaultItemViewModel : ObservableObject
     public bool IsFavorite => VaultItem.IsFavorite;
     public DateTime LastModifiedUtc => VaultItem.LastModifiedUtc;
 
-    [ObservableProperty]
-    private string? _decryptedPassword;
+    [ObservableProperty] private string? _decryptedPassword;
 
-    [ObservableProperty]
-    private bool _isPasswordVisible;
+    [ObservableProperty] private bool _isPasswordVisible;
 
     public string TypeIcon => Type switch
     {
