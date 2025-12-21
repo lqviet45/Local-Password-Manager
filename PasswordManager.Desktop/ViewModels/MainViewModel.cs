@@ -49,10 +49,9 @@ public partial class MainViewModel : ViewModelBase
 
         Title = "Password Manager";
 
-        // DEBUG LOGGING
         Logger.LogInformation("=== MainViewModel Constructor ===");
-        Logger.LogInformation("VaultViewModel Type: {Type}", VaultViewModel.GetType().Name);
-        Logger.LogInformation("SettingsViewModel Type: {Type}", SettingsViewModel.GetType().Name);
+        Logger.LogInformation("VaultViewModel: {Type}", VaultViewModel.GetType().Name);
+        Logger.LogInformation("SettingsViewModel: {Type}", SettingsViewModel.GetType().Name);
 
         // Initialize user info
         if (_sessionService.CurrentUser != null)
@@ -63,12 +62,13 @@ public partial class MainViewModel : ViewModelBase
         }
         else
         {
-            Logger.LogWarning("No current user in session!");
+            Logger.LogWarning("No current user in session during MainViewModel construction!");
         }
 
-        // Set default view - CRITICAL!
+        // CRITICAL: Set default view IMMEDIATELY
         CurrentViewModel = VaultViewModel;
-        Logger.LogInformation("CurrentViewModel set to: {Type}", CurrentViewModel?.GetType().Name ?? "NULL");
+        Logger.LogInformation("✓ CurrentViewModel initialized to: {Type}", 
+            CurrentViewModel.GetType().Name);
 
         // Subscribe to session events
         _sessionService.SessionEnding += OnSessionEnding;

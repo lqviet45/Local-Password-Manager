@@ -1,5 +1,4 @@
 using System.Windows;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using PasswordManager.Desktop.ViewModels;
 
@@ -10,85 +9,73 @@ namespace PasswordManager.Desktop.Views;
 /// </summary>
 public partial class MainWindow : Window
 {
-    private readonly MainViewModel _viewModel;
-    private readonly ILogger<MainWindow>? _logger;
+    private readonly ILogger<MainWindow> _logger;
 
-    // Constructor with MainViewModel injection (preferred)
     public MainWindow(MainViewModel viewModel, ILogger<MainWindow> logger)
     {
-        _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
-        _logger = logger;
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         
-        InitializeWindow();
-    }
-
-    // Fallback constructor for when DI fails
-    public MainWindow()
-    {
-        // Resolve from service provider manually
-        var serviceProvider = App.ServiceProvider;
-        _logger = serviceProvider.GetService<ILogger<MainWindow>>();
-        _viewModel = serviceProvider.GetRequiredService<MainViewModel>();
+        _logger.LogInformation("=== MainWindow Constructor ===");
+        _logger.LogInformation("Received MainViewModel: {Type}", viewModel?.GetType().Name ?? "NULL");
         
-        InitializeWindow();
-    }
-
-    private void InitializeWindow()
-    {
-        _logger?.LogInformation("=== MainWindow Constructor ===");
-        _logger?.LogInformation("MainViewModel Type: {Type}", _viewModel.GetType().Name);
-        _logger?.LogInformation("CurrentViewModel: {Type}", _viewModel.CurrentViewModel?.GetType().Name ?? "NULL");
+        if (viewModel == null)
+        {
+            _logger.LogError("MainViewModel is NULL in constructor!");
+            throw new ArgumentNullException(nameof(viewModel));
+        }
+        
+        // CRITICAL: Set DataContext BEFORE InitializeComponent
+        DataContext = viewModel;
+        _logger.LogInformation("DataContext set to MainViewModel");
         
         InitializeComponent();
         
-        // Set DataContext BEFORE any bindings
-        DataContext = _viewModel;
-        
-        _logger?.LogInformation("DataContext set to: {Type}", DataContext?.GetType().Name ?? "NULL");
+        _logger.LogInformation("MainWindow initialized");
+        _logger.LogInformation("  - CurrentViewModel: {Type}", 
+            viewModel.CurrentViewModel?.GetType().Name ?? "NULL");
     }
 
     private async void Window_Loaded(object sender, RoutedEventArgs e)
     {
-        _logger?.LogInformation("=== MainWindow Loaded ===");
-        _logger?.LogInformation("DataContext Type: {Type}", DataContext?.GetType().Name ?? "NULL");
+        _logger.LogInformation("=== MainWindow Loaded Event ===");
         
-        if (DataContext is MainViewModel vm)
+        if (DataContext is not MainViewModel vm)
         {
-            _logger?.LogInformation("✓ DataContext is MainViewModel");
-            _logger?.LogInformation("MainViewModel.CurrentViewModel: {Type}", 
-                vm.CurrentViewModel?.GetType().Name ?? "NULL");
-            
-            // Force set CurrentViewModel if null
-            if (vm.CurrentViewModel == null)
+            _logger.LogError("DataContext is not MainViewModel!");
+            return;
+        }
+        
+        _logger.LogInformation("DataContext confirmed as MainViewModel");
+        _logger.LogInformation("  - CurrentViewModel: {Type}", 
+            vm.CurrentViewModel?.GetType().Name ?? "NULL");
+        
+        // Ensure CurrentViewModel is set
+        if (vm.CurrentViewModel == null)
+        {
+            _logger.LogWarning("CurrentViewModel is NULL! Setting to VaultViewModel");
+            vm.CurrentViewModel = vm.VaultViewModel;
+        }
+        
+        // Load vault items
+        if (vm.VaultViewModel != null)
+        {
+            _logger.LogInformation("Loading VaultViewModel items...");
+            try
             {
-                _logger?.LogWarning("CurrentViewModel is NULL! Setting to VaultViewModel");
-                vm.CurrentViewModel = vm.VaultViewModel;
+                await vm.VaultViewModel.LoadItemsAsync();
+                _logger.LogInformation("✓ VaultViewModel loaded. Items: {Count}", 
+                    vm.VaultViewModel.TotalItemsCount);
             }
-            
-            // Load vault items when window loads
-            if (vm.VaultViewModel != null)
+            catch (Exception ex)
             {
-                _logger?.LogInformation("Loading VaultViewModel items...");
-                try
-                {
-                    await vm.VaultViewModel.LoadItemsAsync();
-                    _logger?.LogInformation("VaultViewModel loaded successfully. Items count: {Count}", 
-                        vm.VaultViewModel.TotalItemsCount);
-                }
-                catch (Exception ex)
-                {
-                    _logger?.LogError(ex, "Failed to load vault items");
-                }
-            }
-            else
-            {
-                _logger?.LogError("VaultViewModel is NULL!");
+                _logger.LogError(ex, "Failed to load vault items");
+                MessageBox.Show($"Failed to load vault items: {ex.Message}", 
+                    "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
         else
         {
-            _logger?.LogError("❌ DataContext is NOT MainViewModel! Type: {Type}", 
-                DataContext?.GetType().Name ?? "NULL");
+            _logger.LogError("VaultViewModel is NULL!");
         }
     }
 }

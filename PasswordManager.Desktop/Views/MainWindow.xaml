@@ -177,76 +177,49 @@
         </Border>
 
         <!-- Main Content Area -->
+        <!-- Main Content Area -->
         <Border Grid.Column="1" 
                 Background="#FAFAFA">
-            
-            <!-- Debug panel - Remove after testing -->
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="*"/>
-                </Grid.RowDefinitions>
-                
-                <!-- Debug Info -->
-                <Border Grid.Row="0" 
-                        Background="#FFF3E0" 
-                        BorderBrush="#FF9800"
-                        BorderThickness="0,0,0,1"
-                        Padding="10">
-                    <StackPanel>
-                        <TextBlock FontSize="11" Foreground="#E65100">
-                            <Run Text="DEBUG:"/>
-                            <Run Text="CurrentViewModel: "/>
-                            <Run Text="{Binding CurrentViewModel, FallbackValue='NULL'}" FontWeight="Bold"/>
-                        </TextBlock>
-                        <TextBlock FontSize="11" Foreground="#E65100" Margin="0,2,0,0">
-                            <Run Text="User: "/>
-                            <Run Text="{Binding UserEmail, FallbackValue='Not Set'}" FontWeight="Bold"/>
-                        </TextBlock>
-                    </StackPanel>
-                </Border>
-                
-                <!-- Actual Content -->
-                <ContentControl Grid.Row="1" 
-                                Content="{Binding CurrentViewModel}"
-                                Margin="0">
-                    <!-- Fallback content if DataTemplate doesn't work -->
-                    <ContentControl.Style>
-                        <Style TargetType="ContentControl">
-                            <Style.Triggers>
-                                <Trigger Property="Content" Value="{x:Null}">
-                                    <Setter Property="Template">
-                                        <Setter.Value>
-                                            <ControlTemplate>
-                                                <Border Background="White" 
-                                                        Padding="40"
-                                                        Margin="20">
-                                                    <StackPanel HorizontalAlignment="Center" 
-                                                              VerticalAlignment="Center">
-                                                        <TextBlock Text="⚠️" 
-                                                                 FontSize="48" 
-                                                                 HorizontalAlignment="Center"
-                                                                 Margin="0,0,0,20"/>
-                                                        <TextBlock Text="No Content Loaded" 
-                                                                 FontSize="20" 
-                                                                 FontWeight="SemiBold"
-                                                                 HorizontalAlignment="Center"
-                                                                 Margin="0,0,0,10"/>
-                                                        <TextBlock Text="CurrentViewModel is null" 
-                                                                 FontSize="14" 
-                                                                 Foreground="Gray"
-                                                                 HorizontalAlignment="Center"/>
-                                                    </StackPanel>
-                                                </Border>
-                                            </ControlTemplate>
-                                        </Setter.Value>
-                                    </Setter>
-                                </Trigger>
-                            </Style.Triggers>
-                        </Style>
-                    </ContentControl.Style>
-                </ContentControl>
-            </Grid>
+    
+            <!-- Content only - no debug panel -->
+            <ContentControl Content="{Binding CurrentViewModel}"
+                            Margin="0">
+                <!-- Fallback content if binding fails -->
+                <ContentControl.Style>
+                    <Style TargetType="ContentControl">
+                        <Style.Triggers>
+                            <Trigger Property="Content" Value="{x:Null}">
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate>
+                                            <Border Background="White" 
+                                                    Padding="40"
+                                                    Margin="20">
+                                                <StackPanel HorizontalAlignment="Center" 
+                                                          VerticalAlignment="Center">
+                                                    <TextBlock Text="⚠️" 
+                                                             FontSize="48" 
+                                                             HorizontalAlignment="Center"
+                                                             Margin="0,0,0,20"/>
+                                                    <TextBlock Text="No Content Loaded" 
+                                                             FontSize="20" 
+                                                             FontWeight="SemiBold"
+                                                             HorizontalAlignment="Center"
+                                                             Margin="0,0,0,10"/>
+                                                    <TextBlock Text="CurrentViewModel is null" 
+                                                             FontSize="14" 
+                                                             Foreground="Gray"
+                                                             HorizontalAlignment="Center"/>
+                                                </StackPanel>
+                                            </Border>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </ContentControl.Style>
+            </ContentControl>
         </Border>
     </Grid>
 </Window>

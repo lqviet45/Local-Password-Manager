@@ -40,6 +40,7 @@ public partial class App : Application
                     .MinimumLevel.Override("Microsoft", Serilog.Events.LogEventLevel.Warning)
                     .MinimumLevel.Override("System", Serilog.Events.LogEventLevel.Warning)
                     .Enrich.FromLogContext()
+                    .WriteTo.Console()
                     .WriteTo.File(
                         path: "logs/app.log",
                         rollingInterval: RollingInterval.Day,
@@ -66,13 +67,12 @@ public partial class App : Application
 
         // ViewModels - Transient (new instance each time)
         services.AddTransient<LoginViewModel>();
-        services.AddTransient<VaultViewModel>();
-        services.AddTransient<SettingsViewModel>();
-        services.AddTransient<MainViewModel>();
+        services.AddSingleton<VaultViewModel>();
+        services.AddSingleton<SettingsViewModel>();
+        services.AddSingleton<MainViewModel>();
 
         // Views - Transient
         services.AddTransient<LoginWindow>();
-        services.AddTransient<MainWindow>();
         
         // Add Logging
         services.AddLogging();

@@ -363,61 +363,46 @@ public partial class LoginViewModel : ViewModelBase
     }
 
     private void OpenMainWindow()
-{
-    try
     {
-        Logger.LogInformation("=== Opening Main Window ===");
-        Logger.LogInformation("Creating MainWindow via WindowFactory...");
-        
-        var mainWindow = _windowFactory.CreateMainWindow();
-        
-        Logger.LogInformation("MainWindow created. Type: {Type}", mainWindow.GetType().Name);
-        Logger.LogInformation("MainWindow.DataContext Type: {Type}", 
-            mainWindow.DataContext?.GetType().Name ?? "NULL");
-        
-        // Verify MainViewModel setup
-        if (mainWindow.DataContext is MainViewModel mainViewModel)
+        try
         {
-            Logger.LogInformation("✓ DataContext is MainViewModel");
-            Logger.LogInformation("MainViewModel.CurrentViewModel: {Type}", 
-                mainViewModel.CurrentViewModel?.GetType().Name ?? "NULL");
-            Logger.LogInformation("MainViewModel.VaultViewModel: {Type}",
-                mainViewModel.VaultViewModel?.GetType().Name ?? "NULL");
-            Logger.LogInformation("MainViewModel.UserEmail: {Email}", mainViewModel.UserEmail);
-            
-            if (mainViewModel.CurrentViewModel == null)
+            Logger.LogInformation("=== Opening Main Window ===");
+        
+            var mainWindow = _windowFactory.CreateMainWindow();
+        
+            Logger.LogInformation("✓ MainWindow created successfully");
+            Logger.LogInformation("  - DataContext Type: {Type}", 
+                mainWindow.DataContext?.GetType().Name ?? "NULL");
+        
+            if (mainWindow.DataContext is MainViewModel mainViewModel)
             {
-                Logger.LogWarning("⚠ CurrentViewModel is NULL! Setting to VaultViewModel");
-                mainViewModel.CurrentViewModel = mainViewModel.VaultViewModel;
+                Logger.LogInformation("✓ DataContext is MainViewModel");
+                Logger.LogInformation("  - CurrentViewModel: {Type}", 
+                    mainViewModel.CurrentViewModel?.GetType().Name ?? "NULL");
+                Logger.LogInformation("  - UserEmail: {Email}", mainViewModel.UserEmail);
             }
-        }
-        else
-        {
-            Logger.LogError("❌ MainWindow.DataContext is NOT MainViewModel!");
-            Logger.LogError("DataContext actual type: {Type}", 
-                mainWindow.DataContext?.GetType().FullName ?? "NULL");
-            
-            ShowError("Failed to initialize main window properly. Please check logs.");
-            return;
-        }
+            else
+            {
+                Logger.LogError("❌ MainWindow.DataContext is NOT MainViewModel!");
+                ShowError("Failed to initialize main window. Please check logs.");
+                return;
+            }
         
-        Logger.LogInformation("Showing MainWindow...");
-        mainWindow.Show();
-        Logger.LogInformation("MainWindow shown successfully");
+            mainWindow.Show();
+            Logger.LogInformation("✓ MainWindow displayed");
 
-        // Close login window
-        Logger.LogInformation("Closing LoginWindow...");
-        Application.Current.Windows
-            .OfType<Window>()
-            .FirstOrDefault(w => w.DataContext == this)
-            ?.Close();
+            // Close login window
+            Application.Current.Windows
+                .OfType<Window>()
+                .FirstOrDefault(w => w.DataContext == this)
+                ?.Close();
         
-        Logger.LogInformation("=== Main Window Opened Successfully ===");
+            Logger.LogInformation("=== Login window closed ===");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to open main window");
+            ShowError($"Failed to open application: {ex.Message}\n\nSee logs for details.");
+        }
     }
-    catch (Exception ex)
-    {
-        Logger.LogError(ex, "Failed to open main window");
-        ShowError($"Failed to open application: {ex.Message}");
-    }
-}
 }

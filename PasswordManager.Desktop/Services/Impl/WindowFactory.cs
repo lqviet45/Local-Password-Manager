@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using PasswordManager.Desktop.ViewModels;
 using PasswordManager.Desktop.Views;
 
 namespace PasswordManager.Desktop.Services.Impl;
@@ -33,31 +34,31 @@ public sealed class WindowFactory : IWindowFactory
 
     public MainWindow CreateMainWindow()
     {
-        _logger.LogInformation("Creating MainWindow...");
+        _logger.LogInformation("Creating MainWindow via Factory...");
         try
         {
-            // Try to get MainWindow from DI
-            var window = _serviceProvider.GetService<MainWindow>();
+            // Get MainViewModel from DI (this is already fully constructed)
+            var mainViewModel = _serviceProvider.GetRequiredService<MainViewModel>();
+            _logger.LogInformation("✓ MainViewModel resolved: {Type}", mainViewModel.GetType().Name);
+            _logger.LogInformation("  - CurrentViewModel: {Type}", 
+                mainViewModel.CurrentViewModel?.GetType().Name ?? "NULL");
             
-            if (window == null)
-            {
-                _logger.LogWarning("MainWindow not found in DI, creating manually...");
-                window = new MainWindow();
-            }
-            else
-            {
-                _logger.LogInformation("✓ MainWindow resolved from DI");
-            }
+            // Get Logger for MainWindow
+            var logger = _serviceProvider.GetRequiredService<ILogger<MainWindow>>();
             
-            _logger.LogInformation("MainWindow.DataContext: {Type}", 
+            // Create MainWindow manually with ViewModel
+            var window = new MainWindow(mainViewModel, logger);
+            
+            _logger.LogInformation("✓ MainWindow created successfully");
+            _logger.LogInformation("  - DataContext: {Type}", 
                 window.DataContext?.GetType().Name ?? "NULL");
             
             return window;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to create MainWindow, falling back to manual creation");
-            return new MainWindow();
+            _logger.LogError(ex, "Failed to create MainWindow");
+            throw;
         }
     }
 }
