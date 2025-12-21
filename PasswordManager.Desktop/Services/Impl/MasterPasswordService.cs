@@ -32,9 +32,10 @@ public sealed class MasterPasswordService : IMasterPasswordService, IDisposable
 
         lock (_lock)
         {
+            // Allow re-initialization by clearing first
             if (_isInitialized)
             {
-                throw new InvalidOperationException("Master password already initialized");
+                ClearSensitiveDataInternal();
             }
         }
 
@@ -95,27 +96,32 @@ public sealed class MasterPasswordService : IMasterPasswordService, IDisposable
     {
         lock (_lock)
         {
-            // Zero out encryption key
-            if (_encryptionKey != null)
-            {
-                Array.Clear(_encryptionKey, 0, _encryptionKey.Length);
-                _encryptionKey = null;
-            }
-
-            // Zero out salt
-            if (_salt != null)
-            {
-                Array.Clear(_salt, 0, _salt.Length);
-                _salt = null;
-            }
-
-            _isInitialized = false;
-
-            // Force garbage collection to clear sensitive data
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
-            GC.Collect();
+            ClearSensitiveDataInternal();
         }
+    }
+
+    private void ClearSensitiveDataInternal()
+    {
+        // Zero out encryption key
+        if (_encryptionKey != null)
+        {
+            Array.Clear(_encryptionKey, 0, _encryptionKey.Length);
+            _encryptionKey = null;
+        }
+
+        // Zero out salt
+        if (_salt != null)
+        {
+            Array.Clear(_salt, 0, _salt.Length);
+            _salt = null;
+        }
+
+        _isInitialized = false;
+
+        // Force garbage collection to clear sensitive data
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
     }
 
     public void Dispose()

@@ -1,4 +1,5 @@
 using System.Windows;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using PasswordManager.Desktop.ViewModels;
 
@@ -12,11 +13,28 @@ public partial class MainWindow : Window
     private readonly MainViewModel _viewModel;
     private readonly ILogger<MainWindow>? _logger;
 
+    // Constructor with MainViewModel injection (preferred)
     public MainWindow(MainViewModel viewModel, ILogger<MainWindow> logger)
     {
         _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
         _logger = logger;
         
+        InitializeWindow();
+    }
+
+    // Fallback constructor for when DI fails
+    public MainWindow()
+    {
+        // Resolve from service provider manually
+        var serviceProvider = App.ServiceProvider;
+        _logger = serviceProvider.GetService<ILogger<MainWindow>>();
+        _viewModel = serviceProvider.GetRequiredService<MainViewModel>();
+        
+        InitializeWindow();
+    }
+
+    private void InitializeWindow()
+    {
         _logger?.LogInformation("=== MainWindow Constructor ===");
         _logger?.LogInformation("MainViewModel Type: {Type}", _viewModel.GetType().Name);
         _logger?.LogInformation("CurrentViewModel: {Type}", _viewModel.CurrentViewModel?.GetType().Name ?? "NULL");
@@ -26,7 +44,7 @@ public partial class MainWindow : Window
         // Set DataContext BEFORE any bindings
         DataContext = _viewModel;
         
-        _logger?.LogInformation("DataContext set to MainViewModel");
+        _logger?.LogInformation("DataContext set to: {Type}", DataContext?.GetType().Name ?? "NULL");
     }
 
     private async void Window_Loaded(object sender, RoutedEventArgs e)
