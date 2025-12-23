@@ -1,4 +1,4 @@
-﻿using PasswordManager.Domain.Entities;
+﻿using PasswordManager.Shared.Users.Dto;
 
 namespace PasswordManager.Desktop.Services;
 
@@ -11,7 +11,7 @@ public interface ISessionService
     /// <summary>
     /// Current authenticated user.
     /// </summary>
-    User? CurrentUser { get; }
+    UserDto? CurrentUser { get; }
 
     /// <summary>
     /// Indicates if user is logged in.
@@ -21,7 +21,7 @@ public interface ISessionService
     /// <summary>
     /// Starts a session for authenticated user.
     /// </summary>
-    void StartSession(User user);
+    void StartSession(UserDto user);
 
     /// <summary>
     /// Ends current session and clears user data.

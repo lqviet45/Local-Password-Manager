@@ -120,7 +120,7 @@ public partial class MainViewModel : ViewModelBase
         loginWindow.Show();
 
         // Close main window
-        Application.Current.Windows
+        System.Windows.Application.Current.Windows
             .OfType<Window>()
             .FirstOrDefault(w => w.DataContext == this)
             ?.Close();

@@ -3,11 +3,14 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using MediatR;
 using PasswordManager.Desktop.Services;
 using PasswordManager.Desktop.Views;
-using PasswordManager.Domain.Entities;
 using PasswordManager.Domain.Enums;
 using PasswordManager.Domain.Interfaces;
+using PasswordManager.Shared.Vault.Commands;
+using PasswordManager.Shared.Vault.Dto;
+using PasswordManager.Shared.Vault.Queries;
 
 namespace PasswordManager.Desktop.ViewModels;
 
@@ -16,7 +19,7 @@ namespace PasswordManager.Desktop.ViewModels;
 /// </summary>
 public partial class VaultViewModel : ViewModelBase
 {
-    private readonly IVaultRepository _vaultRepository;
+    private readonly IMediator _mediator;
     private readonly ISessionService _sessionService;
     private readonly IClipboardService _clipboardService;
     private readonly IMasterPasswordService _masterPasswordService;
@@ -41,7 +44,7 @@ public partial class VaultViewModel : ViewModelBase
     [ObservableProperty] private int _noteItemsCount;
 
     public VaultViewModel(
-        IVaultRepository vaultRepository,
+        IMediator mediator,
         ISessionService sessionService,
         IClipboardService clipboardService,
         IMasterPasswordService masterPasswordService,
@@ -50,7 +53,7 @@ public partial class VaultViewModel : ViewModelBase
         ILogger<VaultViewModel> logger)
         : base(dialogService, logger)
     {
-        _vaultRepository = vaultRepository ?? throw new ArgumentNullException(nameof(vaultRepository));
+        _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
         _sessionService = sessionService ?? throw new ArgumentNullException(nameof(sessionService));
         _clipboardService = clipboardService ?? throw new ArgumentNullException(nameof(clipboardService));
         _masterPasswordService =
@@ -72,13 +75,16 @@ public partial class VaultViewModel : ViewModelBase
 
             Logger.LogInformation("Loading vault items for user: {UserId}", _sessionService.CurrentUser.Id);
 
-            var items = await _vaultRepository.GetAllAsync(
-                _sessionService.CurrentUser.Id,
-                includeDeleted: false);
+            var result = await _mediator.Send(new GetVaultItemsQuery(_sessionService.CurrentUser.Id, false));
+
+            if (result.IsFailure || result.Value == null)
+            {
+                throw new InvalidOperationException(result.Error?.Message ?? "Failed to load vault items");
+            }
 
             VaultItems.Clear();
 
-            foreach (var item in items)
+            foreach (var item in result.Value)
             {
                 var viewModel = new VaultItemViewModel(item, this);
                 VaultItems.Add(viewModel);
@@ -99,15 +105,7 @@ public partial class VaultViewModel : ViewModelBase
             Logger.LogInformation("Opening Add Item dialog...");
 
             // Create AddEditItemViewModel
-            var addEditViewModel = new AddEditItemViewModel(
-                _vaultRepository,
-                _sessionService,
-                _cryptoProvider,
-                _masterPasswordService,
-                App.ServiceProvider.GetRequiredService<IPasswordStrengthService>(),
-                App.ServiceProvider.GetRequiredService<IHibpService>(),
-                DialogService,
-                App.ServiceProvider.GetRequiredService<ILogger<AddEditItemViewModel>>());
+            var addEditViewModel = App.ServiceProvider.GetRequiredService<AddEditItemViewModel>();
 
             // Initialize with callback that refreshes vault
             addEditViewModel.InitializeForCreate(async (savedItem) =>
@@ -170,15 +168,7 @@ public partial class VaultViewModel : ViewModelBase
             Logger.LogInformation("Opening Edit Item dialog for: {ItemId}", itemToEdit.Id);
 
             // Create AddEditItemViewModel
-            var addEditViewModel = new AddEditItemViewModel(
-                _vaultRepository,
-                _sessionService,
-                _cryptoProvider,
-                _masterPasswordService,
-                App.ServiceProvider.GetRequiredService<IPasswordStrengthService>(),
-                App.ServiceProvider.GetRequiredService<IHibpService>(),
-                DialogService,
-                App.ServiceProvider.GetRequiredService<ILogger<AddEditItemViewModel>>());
+            var addEditViewModel = App.ServiceProvider.GetRequiredService<AddEditItemViewModel>();
 
             // Initialize for editing with callback
             await addEditViewModel.InitializeForEditAsync(itemToEdit.VaultItem,
@@ -242,7 +232,11 @@ public partial class VaultViewModel : ViewModelBase
 
         await ExecuteAsync(async () =>
         {
-            await _vaultRepository.DeleteAsync(itemToDelete.Id);
+            var result = await _mediator.Send(new DeleteVaultItemCommand(itemToDelete.Id));
+            if (result.IsFailure)
+            {
+                throw new InvalidOperationException(result.Error?.Message ?? "Failed to delete item");
+            }
 
             // Refresh from database instead of just removing from collection
             // This ensures we have the latest state
@@ -260,10 +254,13 @@ public partial class VaultViewModel : ViewModelBase
 
         await ExecuteAsync(async () =>
         {
-            var updatedItem = item.VaultItem with { IsFavorite = !item.IsFavorite };
-            await _vaultRepository.UpdateAsync(updatedItem);
+            var result = await _mediator.Send(new ToggleFavoriteCommand(item.Id));
+            if (result.IsFailure || result.Value == null)
+            {
+                throw new InvalidOperationException(result.Error?.Message ?? "Failed to toggle favorite");
+            }
 
-            item.UpdateFromVaultItem(updatedItem);
+            item.UpdateFromVaultItem(result.Value);
             ApplyFilters();
 
             Logger.LogInformation("Toggled favorite for item: {ItemId}", item.Id);
@@ -386,7 +383,7 @@ public partial class VaultItemViewModel : ObservableObject
 {
     private readonly VaultViewModel _parentViewModel;
 
-    public VaultItem VaultItem { get; private set; }
+    public VaultItemDto VaultItem { get; private set; }
 
     public Guid Id => VaultItem.Id;
     public VaultItemType Type => VaultItem.Type;
@@ -420,13 +417,13 @@ public partial class VaultItemViewModel : ObservableObject
         _ => "Unknown"
     };
 
-    public VaultItemViewModel(VaultItem vaultItem, VaultViewModel parentViewModel)
+    public VaultItemViewModel(VaultItemDto vaultItem, VaultViewModel parentViewModel)
     {
         VaultItem = vaultItem ?? throw new ArgumentNullException(nameof(vaultItem));
         _parentViewModel = parentViewModel ?? throw new ArgumentNullException(nameof(parentViewModel));
     }
 
-    public void UpdateFromVaultItem(VaultItem updatedItem)
+    public void UpdateFromVaultItem(VaultItemDto updatedItem)
     {
         VaultItem = updatedItem;
         OnPropertyChanged(nameof(Name));

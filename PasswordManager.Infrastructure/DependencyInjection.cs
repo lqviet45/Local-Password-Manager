@@ -34,6 +34,7 @@ public static class DependencyInjection
         
         // Repositories
         services.AddScoped<IVaultRepository, LocalVaultRepository>();
+        services.AddScoped<IUserRepository, UserRepository>();
         
         // Sync Infrastructure
         services.AddSingleton<SyncQueue>();
@@ -82,6 +83,7 @@ public static class DependencyInjection
         
         // Repositories
         services.AddScoped<IVaultRepository, LocalVaultRepository>();
+        services.AddScoped<IUserRepository, UserRepository>();
         
         // Anomaly Detection
         services.AddScoped<IAnomalyDetector, SimpleAnomalyDetector>();

@@ -2,10 +2,14 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
+using MediatR;
 using PasswordManager.Desktop.Services;
-using PasswordManager.Domain.Entities;
 using PasswordManager.Domain.Enums;
 using PasswordManager.Domain.Interfaces;
+using PasswordManager.Domain.ValueObjects;
+using PasswordManager.Shared.Common.Result;
+using PasswordManager.Shared.Vault.Commands;
+using PasswordManager.Shared.Vault.Dto;
 
 namespace PasswordManager.Desktop.ViewModels;
 
@@ -15,15 +19,15 @@ namespace PasswordManager.Desktop.ViewModels;
 /// </summary>
 public partial class AddEditItemViewModel : ViewModelBase
 {
-    private readonly IVaultRepository _vaultRepository;
+    private readonly IMediator _mediator;
     private readonly ISessionService _sessionService;
     private readonly ICryptoProvider _cryptoProvider;
     private readonly IMasterPasswordService _masterPasswordService;
     private readonly IPasswordStrengthService _passwordStrengthService;
     private readonly IHibpService _hibpService;
 
-    private VaultItem? _existingItem;
-    private Action<VaultItem>? _onSaveCallback;
+    private VaultItemDto? _existingItem;
+    private Action<VaultItemDto>? _onSaveCallback;
 
     [ObservableProperty]
     private VaultItemType _selectedType = VaultItemType.Login;
@@ -81,7 +85,7 @@ public partial class AddEditItemViewModel : ViewModelBase
     public string WindowTitle => IsEditMode ? $"Edit {_existingItem!.Name}" : "Add New Item";
 
     public AddEditItemViewModel(
-        IVaultRepository vaultRepository,
+        IMediator mediator,
         ISessionService sessionService,
         ICryptoProvider cryptoProvider,
         IMasterPasswordService masterPasswordService,
@@ -91,7 +95,7 @@ public partial class AddEditItemViewModel : ViewModelBase
         ILogger<AddEditItemViewModel> logger)
         : base(dialogService, logger)
     {
-        _vaultRepository = vaultRepository ?? throw new ArgumentNullException(nameof(vaultRepository));
+        _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
         _sessionService = sessionService ?? throw new ArgumentNullException(nameof(sessionService));
         _cryptoProvider = cryptoProvider ?? throw new ArgumentNullException(nameof(cryptoProvider));
         _masterPasswordService = masterPasswordService ?? throw new ArgumentNullException(nameof(masterPasswordService));
@@ -108,7 +112,7 @@ public partial class AddEditItemViewModel : ViewModelBase
     /// <summary>
     /// Initialize for creating new item
     /// </summary>
-    public void InitializeForCreate(Action<VaultItem> onSave)
+    public void InitializeForCreate(Action<VaultItemDto> onSave)
     {
         _onSaveCallback = onSave;
         _existingItem = null;
@@ -118,7 +122,7 @@ public partial class AddEditItemViewModel : ViewModelBase
     /// <summary>
     /// Initialize for editing existing item
     /// </summary>
-    public async Task InitializeForEditAsync(VaultItem item, Action<VaultItem> onSave)
+    public async Task InitializeForEditAsync(VaultItemDto item, Action<VaultItemDto> onSave)
     {
         _existingItem = item ?? throw new ArgumentNullException(nameof(item));
         _onSaveCallback = onSave;
@@ -128,7 +132,7 @@ public partial class AddEditItemViewModel : ViewModelBase
         {
             // Decrypt existing password
             var encryptionKey = _masterPasswordService.GetEncryptionKey();
-            var encryptedData = Domain.ValueObjects.EncryptedData.FromCombinedString(item.EncryptedData);
+            var encryptedData = EncryptedData.FromCombinedString(item.EncryptedData);
             var decryptedPassword = await _cryptoProvider.DecryptAsync(encryptedData, encryptionKey);
 
             // Load item data
@@ -158,52 +162,37 @@ public partial class AddEditItemViewModel : ViewModelBase
             // Get encryption key
             var encryptionKey = _masterPasswordService.GetEncryptionKey();
 
-            // Encrypt password
-            var encryptedData = await _cryptoProvider.EncryptAsync(Password, encryptionKey);
+            var request = new VaultItemRequest
+            {
+                Type = SelectedType,
+                Name = Name.Trim(),
+                Username = string.IsNullOrWhiteSpace(Username) ? null : Username.Trim(),
+                Password = Password,
+                Url = string.IsNullOrWhiteSpace(Url) ? null : Url.Trim(),
+                Notes = string.IsNullOrWhiteSpace(Notes) ? null : Notes.Trim(),
+                Tags = string.IsNullOrWhiteSpace(Tags) ? null : Tags.Trim(),
+                IsFavorite = IsFavorite
+            };
 
-            // Create or update vault item
-            var item = _existingItem != null
-                ? _existingItem with
-                {
-                    Type = SelectedType,
-                    Name = Name.Trim(),
-                    Username = string.IsNullOrWhiteSpace(Username) ? null : Username.Trim(),
-                    EncryptedData = encryptedData.ToCombinedString(),
-                    Url = string.IsNullOrWhiteSpace(Url) ? null : Url.Trim(),
-                    Notes = string.IsNullOrWhiteSpace(Notes) ? null : Notes.Trim(),
-                    Tags = string.IsNullOrWhiteSpace(Tags) ? null : Tags.Trim(),
-                    IsFavorite = IsFavorite,
-                    DataHash = _cryptoProvider.ComputeHash(encryptedData.ToCombinedString())
-                }
-                : new VaultItem
-                {
-                    UserId = _sessionService.CurrentUser!.Id,
-                    Type = SelectedType,
-                    Name = Name.Trim(),
-                    Username = string.IsNullOrWhiteSpace(Username) ? null : Username.Trim(),
-                    EncryptedData = encryptedData.ToCombinedString(),
-                    Url = string.IsNullOrWhiteSpace(Url) ? null : Url.Trim(),
-                    Notes = string.IsNullOrWhiteSpace(Notes) ? null : Notes.Trim(),
-                    Tags = string.IsNullOrWhiteSpace(Tags) ? null : Tags.Trim(),
-                    IsFavorite = IsFavorite,
-                    DataHash = _cryptoProvider.ComputeHash(encryptedData.ToCombinedString())
-                };
-
-            // Save to repository
-            VaultItem savedItem;
+            Result<VaultItemDto> result;
             if (_existingItem == null)
             {
-                savedItem = await _vaultRepository.AddAsync(item);
-                Logger.LogInformation("Created new vault item: {ItemId}", savedItem.Id);
+                result = await _mediator.Send(new CreateVaultItemCommand(_sessionService.CurrentUser!.Id, request, encryptionKey));
+                Logger.LogInformation("Created new vault item");
             }
             else
             {
-                savedItem = await _vaultRepository.UpdateAsync(item);
-                Logger.LogInformation("Updated vault item: {ItemId}", savedItem.Id);
+                result = await _mediator.Send(new UpdateVaultItemCommand(_sessionService.CurrentUser!.Id, _existingItem.Id, request, encryptionKey));
+                Logger.LogInformation("Updated vault item: {ItemId}", _existingItem.Id);
+            }
+
+            if (result.IsFailure || result.Value == null)
+            {
+                throw new InvalidOperationException(result.Error?.Message ?? "Failed to save item");
             }
 
             // Callback to parent ViewModel
-            _onSaveCallback?.Invoke(savedItem);
+            _onSaveCallback?.Invoke(result.Value);
 
             Logger.LogInformation("Save successful, signaling window to close");
             

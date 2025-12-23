@@ -8,7 +8,8 @@ using PasswordManager.Desktop.Services;
 using PasswordManager.Desktop.Services.Impl;
 using PasswordManager.Desktop.ViewModels;
 using PasswordManager.Desktop.Views;
-using PasswordManager.Infrastructure;
+using InfrastructureDI = PasswordManager.Infrastructure.DependencyInjection;
+using ApplicationDI = PasswordManager.Application.DependencyInjection;
 using Serilog;
 
 namespace PasswordManager.Desktop;
@@ -17,7 +18,7 @@ namespace PasswordManager.Desktop;
 /// Interaction logic for App.xaml
 /// Configures Dependency Injection and application lifetime.
 /// </summary>
-public partial class App : Application
+public partial class App : System.Windows.Application
 {
     private readonly IHost _host;
 
@@ -55,8 +56,9 @@ public partial class App : Application
         // Register Configuration
         services.AddSingleton(configuration);
 
-        // Infrastructure Services (LOCAL-ONLY MODE)
-        services.AddInfrastructureForDesktop("temporary_password_will_be_replaced");
+        // Application + Infrastructure
+        ApplicationDI.AddApplication(services);
+        InfrastructureDI.AddInfrastructureForDesktop(services, "temporary_password_will_be_replaced");
 
         // Application Services
         services.AddSingleton<IMasterPasswordService, MasterPasswordService>();
@@ -93,7 +95,7 @@ public partial class App : Application
         var serviceProvider = _host.Services;
         try
         {
-            await DependencyInjection.InitializeDatabaseAsync(serviceProvider);
+            await InfrastructureDI.InitializeDatabaseAsync(serviceProvider);
             logger.LogInformation("Database initialized successfully");
         }
         catch (Exception ex)

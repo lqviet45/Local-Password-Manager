@@ -1,12 +1,12 @@
 ﻿using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using MediatR;
 using PasswordManager.Desktop.Services;
-using PasswordManager.Domain.Entities;
 using PasswordManager.Domain.Interfaces;
-using PasswordManager.Infrastructure.Repositories;
+using PasswordManager.Shared.Users.Commands.Login;
+using PasswordManager.Shared.Users.Commands.Register;
 
 namespace PasswordManager.Desktop.ViewModels;
 
@@ -16,8 +16,7 @@ namespace PasswordManager.Desktop.ViewModels;
 /// </summary>
 public partial class LoginViewModel : ViewModelBase
 {
-    private readonly VaultDbContext _dbContext;
-    private readonly ICryptoProvider _cryptoProvider;
+    private readonly IMediator _mediator;
     private readonly IMasterPasswordService _masterPasswordService;
     private readonly ISessionService _sessionService;
     private readonly IPasswordStrengthService _passwordStrengthService;
@@ -40,8 +39,7 @@ public partial class LoginViewModel : ViewModelBase
     [ObservableProperty] private bool _showPassword;
 
     public LoginViewModel(
-        VaultDbContext dbContext,
-        ICryptoProvider cryptoProvider,
+        IMediator mediator,
         IMasterPasswordService masterPasswordService,
         ISessionService sessionService,
         IPasswordStrengthService passwordStrengthService,
@@ -50,8 +48,7 @@ public partial class LoginViewModel : ViewModelBase
         ILogger<LoginViewModel> logger)
         : base(dialogService, logger)
     {
-        _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
-        _cryptoProvider = cryptoProvider ?? throw new ArgumentNullException(nameof(cryptoProvider));
+        _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
         _masterPasswordService =
             masterPasswordService ?? throw new ArgumentNullException(nameof(masterPasswordService));
         _sessionService = sessionService ?? throw new ArgumentNullException(nameof(sessionService));
@@ -73,63 +70,21 @@ public partial class LoginViewModel : ViewModelBase
             Logger.LogInformation("=== LOGIN ATTEMPT START ===");
             Logger.LogInformation("Attempting login for user: {Email}", Email);
 
-            // Get user from database
-            var user = await _dbContext.Users
-                .AsNoTracking()
-                .FirstOrDefaultAsync(u => u.Email.ToLower() == Email.ToLower());
+            var result = await _mediator.Send(new LoginCommand(Email, MasterPassword));
 
-            if (user == null)
+            if (result.IsFailure || result.Value == null)
             {
-                throw new InvalidOperationException("Invalid email or master password");
+                throw new InvalidOperationException(result.Error?.Message ?? "Login failed");
             }
 
-            // Check if account is locked
-            if (user.IsLocked)
-            {
-                throw new InvalidOperationException(
-                    $"Account is locked due to too many failed attempts. Please try again later.");
-            }
-
-            // Verify master password
-            Logger.LogInformation("Verifying master password...");
-            var isValid = await _masterPasswordService.VerifyMasterPasswordAsync(
-                MasterPassword,
-                user.MasterPasswordHash);
-
-            if (!isValid)
-            {
-                Logger.LogWarning("Password verification FAILED");
-                await IncrementFailedLoginAttemptsAsync(user);
-                throw new InvalidOperationException("Invalid email or master password");
-            }
-
-            Logger.LogInformation("✓ Password verification SUCCESS");
-
-            // Reset failed attempts on successful login
-            if (user.FailedLoginAttempts > 0)
-            {
-                var userToUpdate = await _dbContext.Users
-                    .FindAsync(user.Id);
-                
-                if (userToUpdate == null)
-                {
-                    throw new InvalidOperationException("User not found during failed attempts reset");
-                }
-                
-                userToUpdate.FailedLoginAttempts = 0;
-                userToUpdate.LastFailedLoginUtc = null;
-                userToUpdate.LastLoginUtc = DateTime.UtcNow;
-                await _dbContext.SaveChangesAsync();
-            }
-
-            await _masterPasswordService.InitializeAsync(MasterPassword, user.Salt);
+            await _masterPasswordService.InitializeAsync(MasterPassword, result.Value.Salt);
 
             // Check state after initialization
             Logger.LogInformation("MasterPasswordService.IsInitialized AFTER: {IsInitialized}",
                 _masterPasswordService.IsInitialized);
 
             // Start user session
-            _sessionService.StartSession(user);
+            _sessionService.StartSession(result.Value.User);
 
             Logger.LogInformation("Login successful for user: {Email}", Email);
 
@@ -148,53 +103,12 @@ public partial class LoginViewModel : ViewModelBase
         {
             Logger.LogInformation("Attempting registration for user: {Email}", Email);
 
-            // Check if user already exists
-            var existingUser = await _dbContext.Users
-                .FirstOrDefaultAsync(u => u.Email.ToLower() == Email.ToLower());
+            var result = await _mediator.Send(new RegisterUserCommand(Email, MasterPassword));
 
-            if (existingUser != null)
+            if (result.IsFailure || result.Value == null)
             {
-                throw new InvalidOperationException("Email is already registered");
+                throw new InvalidOperationException(result.Error?.Message ?? "Registration failed");
             }
-
-            // Check password strength
-            var strength = _passwordStrengthService.EvaluateStrength(MasterPassword);
-            if (strength < Domain.Enums.StrengthLevel.Fair)
-            {
-                throw new InvalidOperationException(
-                    "Master password is too weak. Please choose a stronger password.");
-            }
-
-            // Hash master password using Argon2id
-            var passwordHash = await _cryptoProvider.HashPasswordAsync(MasterPassword);
-
-            // Generate master encryption key (256-bit random key)
-            var masterKey = _cryptoProvider.GenerateRandomKey(32);
-
-            // Derive encryption key from master password
-            var (encryptionKey, salt) = await _cryptoProvider.DeriveKeyAsync(MasterPassword);
-
-            // Encrypt master key with derived key
-            var encryptedMasterKey = await _cryptoProvider.EncryptAsync(
-                Convert.ToBase64String(masterKey),
-                encryptionKey);
-
-            // Create user entity
-            var user = new User
-            {
-                Email = Email,
-                MasterPasswordHash = passwordHash,
-                Salt = salt,
-                EncryptedMasterKey = encryptedMasterKey.ToCombinedString(),
-                IsPremium = false, // Free tier by default
-                EmailVerified = false,
-                TwoFactorEnabled = false,
-                CreatedAtUtc = DateTime.UtcNow
-            };
-
-            // Save to database
-            await _dbContext.Users.AddAsync(user);
-            await _dbContext.SaveChangesAsync();
 
             Logger.LogInformation("Registration successful for user: {Email}", Email);
 
@@ -350,24 +264,6 @@ public partial class LoginViewModel : ViewModelBase
         PasswordStrengthScore = 0;
     }
 
-    private async Task IncrementFailedLoginAttemptsAsync(User user)
-    {
-        var failedAttempts = user.FailedLoginAttempts + 1;
-        var isLocked = failedAttempts >= 5;
-
-        user.FailedLoginAttempts = failedAttempts;
-        user.LastFailedLoginUtc = DateTime.UtcNow;
-        user.IsLocked = isLocked;
-
-        _dbContext.Users.Update(user);
-        await _dbContext.SaveChangesAsync();
-
-        if (isLocked)
-        {
-            Logger.LogWarning("Account locked for user: {Email}", user.Email);
-        }
-    }
-
     private void OpenMainWindow()
     {
         try
@@ -398,7 +294,7 @@ public partial class LoginViewModel : ViewModelBase
             Logger.LogInformation("✓ MainWindow displayed");
 
             // Close login window
-            Application.Current.Windows
+            System.Windows.Application.Current.Windows
                 .OfType<Window>()
                 .FirstOrDefault(w => w.DataContext == this)
                 ?.Close();

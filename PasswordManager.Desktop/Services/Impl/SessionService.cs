@@ -1,14 +1,14 @@
-﻿using PasswordManager.Domain.Entities;
+﻿using PasswordManager.Shared.Users.Dto;
 
 namespace PasswordManager.Desktop.Services.Impl;
 
 public sealed class SessionService : ISessionService
 {
-    private User? _currentUser;
+    private UserDto? _currentUser;
     private DateTime _lastActivity;
     private readonly object _lock = new();
 
-    public User? CurrentUser
+    public UserDto? CurrentUser
     {
         get
         {
@@ -33,7 +33,7 @@ public sealed class SessionService : ISessionService
     public event EventHandler? SessionEnding;
     public event EventHandler? SessionEnded;
 
-    public void StartSession(User user)
+    public void StartSession(UserDto user)
     {
         ArgumentNullException.ThrowIfNull(user);
 
