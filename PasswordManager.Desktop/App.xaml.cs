@@ -21,6 +21,10 @@ namespace PasswordManager.Desktop;
 public partial class App : System.Windows.Application
 {
     private readonly IHost _host;
+    
+    // Desktop-specific services
+    private ISystemTrayService? _systemTrayService;
+    private IGlobalHotKeyService? _hotKeyService;
 
     public App()
     {
@@ -64,7 +68,12 @@ public partial class App : System.Windows.Application
         services.AddSingleton<IMasterPasswordService, MasterPasswordService>();
         services.AddSingleton<ISessionService, SessionService>();
         services.AddSingleton<IDialogService, DialogService>();
-        services.AddSingleton<IClipboardService, ClipboardService>();
+        
+        // Desktop-specific services (System Tray, Hotkeys, Clipboard)
+        services.AddSingleton<ISystemTrayService, SystemTrayService>();
+        services.AddSingleton<IGlobalHotKeyService, GlobalHotKeyService>();
+        services.AddSingleton<IClipboardService, ClipboardService>(); // Enhanced clipboard with auto-clear
+        
         services.AddSingleton<IWindowFactory, WindowFactory>();
 
         // ViewModels - Transient (new instance each time)
@@ -107,6 +116,19 @@ public partial class App : System.Windows.Application
             return;
         }
 
+        // Initialize desktop-specific services
+        try
+        {
+            _systemTrayService = serviceProvider.GetRequiredService<ISystemTrayService>();
+            _hotKeyService = serviceProvider.GetRequiredService<IGlobalHotKeyService>();
+            logger.LogInformation("Desktop services initialized successfully");
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to initialize desktop services (non-critical)");
+            // Continue without desktop features
+        }
+
         // Show login window
         try
         {
@@ -126,6 +148,21 @@ public partial class App : System.Windows.Application
 
     protected override async void OnExit(ExitEventArgs e)
     {
+        var logger = _host.Services.GetRequiredService<ILogger<App>>();
+        logger.LogInformation("=== APPLICATION SHUTDOWN ===");
+
+        // Dispose desktop services
+        try
+        {
+            _systemTrayService?.Dispose();
+            _hotKeyService?.Dispose();
+            logger.LogInformation("Desktop services disposed successfully");
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Error disposing desktop services");
+        }
+
         using (_host)
         {
             await _host.StopAsync();
@@ -134,5 +171,79 @@ public partial class App : System.Windows.Application
         base.OnExit(e);
     }
 
+    /// <summary>
+    /// Initializes system tray and hotkeys for the main window.
+    /// Call this from MainWindow.OnLoaded event.
+    /// </summary>
+    public void InitializeDesktopFeatures(Window mainWindow)
+    {
+        var logger = _host.Services.GetRequiredService<ILogger<App>>();
+
+        if (_systemTrayService == null || _hotKeyService == null)
+        {
+            logger.LogWarning("Cannot initialize desktop features: Services not available");
+            return;
+        }
+
+        try
+        {
+            // Initialize hotkey service with main window handle
+            var helper = new System.Windows.Interop.WindowInteropHelper(mainWindow);
+            _hotKeyService.Initialize(helper.Handle);
+
+            // Register default hotkeys
+            // Ctrl+Shift+L - Show/Hide Password Manager
+            _hotKeyService.RegisterHotKey(
+                "toggle-window",
+                HotKeyModifiers.Control | HotKeyModifiers.Shift,
+                0x4C, // VK_L
+                () =>
+                {
+                    Dispatcher.Invoke(() =>
+                    {
+                        if (mainWindow.IsVisible && mainWindow.WindowState != WindowState.Minimized)
+                        {
+                            _systemTrayService.MinimizeToTray();
+                        }
+                        else
+                        {
+                            _systemTrayService.RestoreFromTray();
+                        }
+                    });
+                },
+                "Toggle Password Manager Window (Ctrl+Shift+L)"
+            );
+
+            // Ctrl+Shift+C - Copy password (will be implemented in VaultViewModel)
+            _hotKeyService.RegisterHotKey(
+                "copy-password",
+                HotKeyModifiers.Control | HotKeyModifiers.Shift,
+                0x43, // VK_C
+                () =>
+                {
+                    logger.LogDebug("Copy password hotkey triggered");
+                    // TODO: Implement copy selected password from vault
+                },
+                "Copy Selected Password (Ctrl+Shift+C)"
+            );
+
+            logger.LogInformation("Desktop features (System Tray + Hotkeys) initialized successfully");
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to initialize desktop features");
+        }
+    }
+
     public static IServiceProvider ServiceProvider => ((App)Current)._host.Services;
+
+    /// <summary>
+    /// Gets the system tray service instance.
+    /// </summary>
+    public ISystemTrayService? SystemTray => _systemTrayService;
+
+    /// <summary>
+    /// Gets the hotkey service instance.
+    /// </summary>
+    public IGlobalHotKeyService? HotKeys => _hotKeyService;
 }
