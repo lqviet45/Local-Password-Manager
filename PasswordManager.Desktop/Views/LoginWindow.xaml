@@ -6,7 +6,7 @@
         xmlns:viewmodels="clr-namespace:PasswordManager.Desktop.ViewModels"
         d:DataContext="{d:DesignInstance Type=viewmodels:LoginViewModel}"
         mc:Ignorable="d"
-        Title="Password Manager" 
+        Title="SecureVault - Login" 
         Height="650" 
         Width="450"
         MinHeight="500"
